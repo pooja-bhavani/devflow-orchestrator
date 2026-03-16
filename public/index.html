@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>DevFlow Orchestrator</title>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Glassmorphism UI",sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh;padding:1.5rem}
+header{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem}
+header h1{font-size:1.4rem;font-weight:700}
+header p{font-size:0.8rem;color:#8b949e}
+.trigger{display:flex;gap:0.5rem;margin-bottom:1.25rem;align-items:center;flex-wrap:wrap}
+.trigger input{max-width:150px;padding:0.45rem 0.7rem;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:0.85rem}
+.trigger button{padding:0.45rem 1rem;background:#fc6d26;border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:0.85rem}
+.trigger button:hover{background:#e24329}
+.hint{font-size:0.75rem;color:#8b949e}
+
+/* Metrics */
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:0.5rem;margin-bottom:1rem}
+@media(max-width:800px){.metrics{grid-template-columns:repeat(3,1fr)}}
+.metric{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.6rem;text-align:center}
+.metric .val{font-size:1.4rem;font-weight:700;line-height:1}
+.metric .lbl{font-size:0.65rem;color:#8b949e;margin-top:0.2rem}
+.metric.crit .val{color:#f85149}.metric.warn .val{color:#d29922}.metric.ok .val{color:#3fb950}
+
+/* Charts */
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem}
+@media(max-width:800px){.charts{grid-template-columns:1fr}}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.85rem}
+.card h3{font-size:0.72rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.6rem}
+canvas{max-height:140px}
+
+/* Pipeline */
+.pipeline-title{font-size:0.72rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.5rem}
+.stage-card{border:1px solid #30363d;border-radius:6px;overflow:hidden;margin-bottom:0.4rem;transition:border-color .2s}
+.stage-card.running{border-color:#d29922}
+.stage-card.done{border-color:#3fb950}
+.stage-card.error{border-color:#f85149}
+.stage-header{display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.85rem;background:#161b22;cursor:pointer;user-select:none}
+.stage-header:hover{background:#1c2128}
+.stage-header .icon{font-size:1rem;width:1.3rem;text-align:center}
+.stage-header .label{flex:1;font-size:0.83rem;font-weight:500}
+.stage-header .dur{font-size:0.7rem;color:#8b949e;min-width:3rem;text-align:right}
+.badge{font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:10px;font-weight:700;text-transform:uppercase}
+.badge.running{background:#d2992233;color:#d29922}
+.badge.done{background:#3fb95033;color:#3fb950}
+.badge.error{background:#f8514933;color:#f85149}
+.badge.idle{background:#21262d;color:#8b949e}
+.chevron{font-size:0.75rem;color:#8b949e;transition:transform .2s;margin-left:0.25rem}
+.chevron.open{transform:rotate(90deg)}
+
+/* GitLab CI runner-style log */
+.stage-log{display:none;background:#0a0c10;border-top:1px solid #21262d;max-height:340px;overflow-y:auto;font-family:"SFMono-Regular",Consolas,monospace;font-size:0.71rem;line-height:1.75}
+.stage-log.open{display:block}
+
+/* Section header — green bold like GitLab */
+.log-sec{display:flex;align-items:center;padding:0.18rem 0.6rem;background:#0d2818;border-top:1px solid #1a3a25;border-bottom:1px solid #1a3a25;color:#3fb950;font-weight:700;gap:0.4rem}
+.log-sec .sec-dur{margin-left:auto;color:#3d6b4a;font-weight:400;font-size:0.68rem}
+
+/* Log line: linenum | timestamp | text */
+.ll{display:flex;min-height:1.3em}
+.ll .n{color:#3d444d;min-width:3.5rem;padding:0 0.5rem;text-align:right;user-select:none;flex-shrink:0;border-right:1px solid #161b22}
+.ll .t{color:#3d444d;min-width:6.5rem;padding:0 0.5rem;flex-shrink:0}
+.ll .m{flex:1;padding:0 0.5rem;word-break:break-all;white-space:pre-wrap}
+.ll.tool .m{color:#79c0ff}
+.ll.ok   .m{color:#3fb950}
+.ll.ai   .m{color:#e6edf3}
+.ll.dim  .m{color:#8b949e}
+.ll.err  .m{color:#f85149;font-weight:600}
+.ll.warn .m{color:#d29922}
+.ll.pass .m{color:#3fb950;font-weight:700}
+.ll.cmd  .m{color:#e6edf3}
+.ll.cmd  .m::before{content:"$ ";color:#3fb950}
+
+.cursor{display:inline-block;width:6px;height:11px;background:#d29922;animation:blink 1s step-end infinite;vertical-align:middle;margin-left:2px}
+@keyframes blink{50%{opacity:0}}
+
+.powered{font-size:0.72rem;color:#8b949e;margin-top:1rem}
+.powered span{color:#fc6d26;font-weight:600}
+</style>
+</head>
+<body>
+
+<header>
+  <div><h1>DevFlow Orchestrator</h1><p>DevOps and Cloud Engineer  · GitLab Duo Agent Platform · Anthropic Claude</p></div>
+</header>
+
+<div class="trigger">
+  <input id="issueInput" type="number" placeholder="Issue IID" min="1" value="3"/>
+  <button onclick="triggerPipeline()">▶ Run Pipeline</button>
+  <span class="hint">Issue #3 — PROD: BankApp CrashLoopBackOff + OOMKilled + CVEs</span>
+</div>
+
+<div class="metrics">
+  <div class="metric crit"><div class="val" id="m-cpu">94%</div><div class="lbl">CPU Usage</div></div>
+  <div class="metric crit"><div class="val" id="m-mem">98%</div><div class="lbl">Memory</div></div>
+  <div class="metric crit"><div class="val" id="m-pods">8</div><div class="lbl">Pod Restarts</div></div>
+  <div class="metric crit"><div class="val" id="m-db">10/10</div><div class="lbl">DB Connections</div></div>
+  <div class="metric crit"><div class="val" id="m-5xx">67%</div><div class="lbl">HTTP 5xx</div></div>
+  <div class="metric crit"><div class="val" id="m-pipe">0%</div><div class="lbl">Pipeline OK</div></div>
+</div>
+
+<div class="charts">
+  <div class="card"><h3>CPU &amp; Memory %</h3><canvas id="cCpuMem"></canvas></div>
+  <div class="card"><h3>Pod Restarts &amp; HTTP 5xx %</h3><canvas id="cPods"></canvas></div>
+</div>
+
+<div class="pipeline-title">Pipeline Stages</div>
+<div id="pipeline"></div>
+
+<div class="powered">Powered by <span>GitLab Duo Agent Platform</span> + <span>Anthropic Claude</span></div>
+
+<script>
+// ── Stage definitions ────────────────────────────────────────────────────────
+const STAGES = [
+  {key:"init",         icon:"📋" ,label:"Fetch Issue from GitLab"},
+  {key:"duo_workflow", icon:"🦾",label:"Trigger GitLab Duo Agent Workflow"},
+  {key:"polling",      icon:"⚙️",label:"Agents Running — Diagnose → Fix → Security → Test → Deploy → Monitor"},
+  {key:"done",         icon:"✅",label:"Pipeline Complete — MR Created"},
+  {key:"failed",       icon:"🔴",label:"Pipeline Failed"},
+]
+
+const stageLineNum = {}
+const stageIsOpen  = {}
+const stageStartMs = {}
+
+// ── Build pipeline cards ─────────────────────────────────────────────────────
+function buildPipeline() {
+  document.getElementById("pipeline").innerHTML = STAGES.map(s => `
+    <div class="stage-card" id="card-${s.key}">
+      <div class="stage-header" onclick="toggle('${s.key}')">
+        <span class="icon">${s.icon}</span>
+        <span class="label">${s.label}</span>
+        <span class="dur" id="dur-${s.key}"></span>
+        <span class="badge idle" id="badge-${s.key}">idle</span>
+        <span class="chevron" id="chev-${s.key}">›</span>
+      </div>
+      <div class="stage-log" id="log-${s.key}"></div>
+    </div>`).join("")
+  STAGES.forEach(s => { stageLineNum[s.key] = 1; stageIsOpen[s.key] = false })
+}
+
+function toggle(key) {
+  stageIsOpen[key] = !stageIsOpen[key]
+  document.getElementById("log-"  + key).classList.toggle("open",  stageIsOpen[key])
+  document.getElementById("chev-" + key).classList.toggle("open", stageIsOpen[key])
+}
+
+function openOnly(key) {
+  STAGES.forEach(s => {
+    if (s.key !== key && stageIsOpen[s.key]) toggle(s.key)
+  })
+  if (!stageIsOpen[key]) toggle(key)
+}
+
+// ── Stage status ─────────────────────────────────────────────────────────────
+function setStage(key, status) {
+  const card  = document.getElementById("card-"  + key)
+  const badge = document.getElementById("badge-" + key)
+  if (!card) return
+  card.className  = "stage-card " + status
+  badge.className = "badge " + status
+  badge.textContent = status
+  if (status === "running" && !stageStartMs[key]) {
+    stageStartMs[key] = Date.now()
+    openOnly(key)
+  }
+  if ((status === "done" || status === "error") && stageStartMs[key]) {
+    document.getElementById("dur-" + key).textContent =
+      ((Date.now() - stageStartMs[key]) / 1000).toFixed(0) + "s"
+  }
+}
+
+// ── Append a log line to a stage ─────────────────────────────────────────────
+function ts() {
+  const d = new Date()
+  return String(d.getHours()).padStart(2,"0") + ":" +
+         String(d.getMinutes()).padStart(2,"0") + ":" +
+         String(d.getSeconds()).padStart(2,"0")
+}
+
+function appendLog(key, text, type) {
+  const log = document.getElementById("log-" + key)
+  if (!log) return
+  log.querySelector(".cursor")?.remove()
+  const ll = document.createElement("div")
+  ll.className = "ll " + (type || classify(text))
+  ll.innerHTML = `<span class="n">${stageLineNum[key]++}</span><span class="t">${ts()}</span><span class="m">${esc(text)}<span class="cursor"></span></span>`
+  log.appendChild(ll)
+  log.scrollTop = log.scrollHeight
+}
+
+function appendSection(key, title, dur) {
+  const log = document.getElementById("log-" + key)
+  if (!log) return
+  const sec = document.createElement("div")
+  sec.className = "log-sec"
+  sec.innerHTML = `<span>▶ ${esc(title)}</span>${dur ? `<span class="sec-dur">${dur}</span>` : ""}`
+  log.appendChild(sec)
+  log.scrollTop = log.scrollHeight
+}
+
+function classify(msg) {
+  if (msg.startsWith("❌") || /error|fail|killed|crash|exception|oom/i.test(msg)) return "err"
+  if (msg.startsWith("✅") || msg.startsWith("✏️") || /succeeded|fixed|resolved|applied|created|updated|written/i.test(msg)) return "ok"
+  if (msg.startsWith("⚠️") || /warn|cve|critical|high|missing|exhausted|blocking/i.test(msg)) return "warn"
+  if (msg.startsWith("🔧") || msg.startsWith("🔍") || msg.startsWith("📖") || msg.startsWith("📁") || msg.startsWith("🌿") || msg.startsWith("🔀")) return "tool"
+  if (msg.startsWith("🚀") || msg.startsWith("🤖")) return "think"
+  if (msg.startsWith("$")) return "cmd"
+  return "dim"
+}
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") }
+
+// ── Inject GitLab-runner style boot lines for a stage ────────────────────────
+function injectRunnerHeader(key, jobName) {
+  const runnerIds = {
+    init:         "YKxHNyexq",
+    duo_workflow: "ns46NMmJT",
+    polling:      "s_85d7af18",
+    done:         "YKxHNyexq",
+    failed:       "ns46NMmJT",
+  }
+  const rid = runnerIds[key] || "YKxHNyexq"
+  appendSection(key, "Preparing the runner")
+  appendLog(key, `Running with gitlab-runner 18.10.0 on green-2.saas-linux-small-amd64.runners-manager.gitlab.com/default ${rid}`, "dim")
+  appendLog(key, `feature flags: FF_USE_GIT_PROACTIVE_AUTH:true`, "dim")
+  appendSection(key, "Preparing the \"docker+machine\" executor", "00:02")
+  appendLog(key, `Using Docker executor with image registry.gitlab.com/gitlab-org/duo-workflow/default-docker-image/workflow-generic-image:v0.0.6`, "dim")
+  appendLog(key, `Pulling docker image workflow-generic-image:v0.0.6 ...`, "tool")
+  appendSection(key, "Getting source from Git repository", "00:02")
+  appendLog(key, `Fetching changes with git depth set to 20...`, "dim")
+  appendLog(key, `Initialized empty Git repository in /builds/gitlab-ai-hackathon/participants/23075558/.git/`, "dim")
+  appendLog(key, `Checking out 05b7e56c as detached HEAD (ref is devflow/fix/issue-3-prod-incident)...`, "dim")
+  appendSection(key, `Executing "${jobName}" stage of the job script`)
+}
+
+// ── Charts ───────────────────────────────────────────────────────────────────
+const LABELS = ["T-10m","T-8m","T-6m","T-4m","T-2m","Now"]
+const iCpu=[72,78,85,90,94,94], fCpu=[94,80,60,45,35,28]
+const iMem=[60,72,85,94,98,98], fMem=[98,75,55,42,38,35]
+const iR=[0,1,2,4,6,8],         fR=[8,8,8,8,8,8]
+const i5=[2,8,20,40,60,67],     f5=[67,50,30,10,2,0]
+let cpuChart, podsChart
+
+function mkChart(id, ds) {
+  return new Chart(document.getElementById(id).getContext("2d"),{
+    type:"line", data:{labels:LABELS, datasets:ds},
+    options:{responsive:true,maintainAspectRatio:true,animation:{duration:800},
+      plugins:{legend:{labels:{color:"#8b949e",font:{size:10}}}},
+      scales:{x:{ticks:{color:"#8b949e",font:{size:9}},grid:{color:"#21262d"}},
+              y:{ticks:{color:"#8b949e",font:{size:9}},grid:{color:"#21262d"}}}}
+  })
+}
+
+function initCharts() {
+  cpuChart  = mkChart("cCpuMem",[
+    {label:"CPU %",    data:[...iCpu],borderColor:"#f85149",backgroundColor:"#f8514922",tension:.4,fill:true},
+    {label:"Memory %", data:[...iMem],borderColor:"#d29922", backgroundColor:"#d2992222",tension:.4,fill:true},
+  ])
+  podsChart = mkChart("cPods",[
+    {label:"Pod Restarts",data:[...iR],borderColor:"#f85149",backgroundColor:"#f8514922",tension:.4,fill:true},
+    {label:"HTTP 5xx %",  data:[...i5],borderColor:"#d29922", backgroundColor:"#d2992222",tension:.4,fill:true},
+  ])
+}
+
+function animateRecovery() {
+  let i=0
+  const iv=setInterval(()=>{
+    if(i>=6){clearInterval(iv);return}
+    cpuChart.data.datasets[0].data  = fCpu.map((v,j)=>j<=i?v:iCpu[j])
+    cpuChart.data.datasets[1].data  = fMem.map((v,j)=>j<=i?v:iMem[j])
+    podsChart.data.datasets[0].data = fR.map((v,j)=>j<=i?v:iR[j])
+    podsChart.data.datasets[1].data = f5.map((v,j)=>j<=i?v:i5[j])
+    cpuChart.update(); podsChart.update()
+    if(i>=3){
+      document.getElementById("m-cpu").textContent  = fCpu[i]+"%"
+      document.getElementById("m-mem").textContent  = fMem[i]+"%"
+      document.getElementById("m-5xx").textContent  = f5[i]+"%"
+      document.getElementById("m-db").textContent   = "3/10"
+      document.getElementById("m-pipe").textContent = "100%"
+      document.querySelectorAll(".metric").forEach(m=>{m.classList.remove("crit","warn");m.classList.add("ok")})
+    }
+    i++
+  },1200)
+}
+
+function resetMetrics() {
+  ["m-cpu","m-mem","m-pods","m-db","m-5xx","m-pipe"].forEach((id,i)=>{
+    document.getElementById(id).textContent=["94%","98%","8","10/10","67%","0%"][i]
+  })
+  document.querySelectorAll(".metric").forEach(m=>{m.classList.remove("ok","warn");m.classList.add("crit")})
+  cpuChart.data.datasets[0].data=[...iCpu]; cpuChart.data.datasets[1].data=[...iMem]; cpuChart.update()
+  podsChart.data.datasets[0].data=[...iR];  podsChart.data.datasets[1].data=[...i5];  podsChart.update()
+}
+
+// ── Trigger ──────────────────────────────────────────────────────────────────
+async function triggerPipeline() {
+  const iid = document.getElementById("issueInput").value
+  if (!iid) return alert("Enter a GitLab Issue IID")
+  buildPipeline(); resetMetrics()
+  await fetch(`/trigger/${iid}`, {method:"POST"})
+}
+
+// ── Socket — map events to stage logs ────────────────────────────────────────
+const socket = io()
+
+// Live metrics — auto-update without any refresh
+socket.on("metrics:update", ({cpu, mem, pods, db, e5xx, pipeOk}) => {
+  document.getElementById("m-cpu").textContent  = cpu + "%"
+  document.getElementById("m-mem").textContent  = mem + "%"
+  document.getElementById("m-pods").textContent = pods
+  document.getElementById("m-db").textContent   = db + "/10"
+  document.getElementById("m-5xx").textContent  = e5xx + "%"
+  document.getElementById("m-pipe").textContent = pipeOk + "%"
+
+  // Update chart — shift oldest point off, push new value
+  const pushPoint = (chart, dsIdx, val) => {
+    chart.data.datasets[dsIdx].data.shift()
+    chart.data.datasets[dsIdx].data.push(val)
+  }
+  pushPoint(cpuChart,  0, cpu);  pushPoint(cpuChart,  1, mem)
+  pushPoint(podsChart, 0, pods); pushPoint(podsChart, 1, e5xx)
+  cpuChart.update("none"); podsChart.update("none")
+
+  // Color metric tiles
+  document.querySelectorAll(".metric").forEach(m => {
+    m.classList.remove("crit","warn","ok")
+    const v = parseInt(m.querySelector(".val").textContent)
+    m.classList.add(v >= 80 ? "crit" : v >= 50 ? "warn" : "ok")
+  })
+})
+
+// Track which stages have had their runner header injected
+const headerDone = {}
+
+socket.on("pipeline:event", ({stage, status, message}) => {
+  setStage(stage, status)
+
+  // Inject runner boot header once per stage when it starts running
+  if (status === "running" && !headerDone[stage]) {
+    headerDone[stage] = true
+    const jobNames = {
+      init:         "fetch-issue",
+      duo_workflow: "trigger-duo-workflow",
+      polling:      "agent-pipeline",
+      done:         "create-mr",
+      failed:       "pipeline-failed",
+    }
+    injectRunnerHeader(stage, jobNames[stage] || stage)
+    appendSection(stage, "Running agent steps")
+  }
+
+  appendLog(stage, message)
+
+  if (status === "done" || status === "error") {
+    document.getElementById("log-" + stage).querySelector(".cursor")?.remove()
+    appendSection(stage, status === "done" ? "Job succeeded" : "Job failed",
+      document.getElementById("dur-" + stage).textContent)
+    appendLog(stage, status === "done" ? "Job succeeded" : "Job failed — see errors above",
+      status === "done" ? "pass" : "err")
+    appendSection(stage, "Cleaning up project directory and file based variables", "00:01")
+  }
+
+  if (stage === "done" && status === "done") {
+    appendLog("done", "✅ All production fixes applied — metrics updating live...", "ok")
+  }
+})
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+buildPipeline()
+initCharts()
+</script>
+</body>
+</html>

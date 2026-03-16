@@ -1,0 +1,173 @@
+name: "DevFlow Orchestrator"
+description: "Full SDLC automation flow: issue → spec → code → security scan → tests → MR. Triggered by GitLab issue creation. Powered by Anthropic Claude via GitLab Duo."
+public: true
+definition:
+  version: v1
+  environment: ambient
+
+  components:
+    - name: "spec_agent"
+      type: AgentComponent
+      prompt_id: "spec_prompt"
+      inputs:
+        - "context:goal"
+      toolset:
+        - get_issue
+        - read_file
+      ui_log_events:
+        - on_agent_final_answer
+
+    - name: "code_agent"
+      type: AgentComponent
+      prompt_id: "code_prompt"
+      inputs:
+        - "context:spec_agent"
+      toolset:
+        - read_file
+        - create_file
+      ui_log_events:
+        - on_agent_final_answer
+        - on_tool_execution_success
+
+    - name: "security_agent"
+      type: AgentComponent
+      prompt_id: "security_prompt"
+      inputs:
+        - "context:code_agent"
+      toolset:
+        - read_file
+      ui_log_events:
+        - on_agent_final_answer
+
+    - name: "test_agent"
+      type: AgentComponent
+      prompt_id: "test_prompt"
+      inputs:
+        - "context:code_agent"
+        - "context:spec_agent"
+      toolset:
+        - read_file
+        - create_file
+      ui_log_events:
+        - on_agent_final_answer
+        - on_tool_execution_success
+
+    - name: "review_agent"
+      type: AgentComponent
+      prompt_id: "review_prompt"
+      inputs:
+        - "context:code_agent"
+        - "context:test_agent"
+        - "context:security_agent"
+      toolset:
+        - read_file
+        - create_merge_request
+        - create_issue_note
+      ui_log_events:
+        - on_agent_final_answer
+        - on_tool_execution_success
+
+  prompts:
+    - prompt_id: "spec_prompt"
+      name: "Spec Agent Prompt"
+      prompt_template:
+        system: |
+          You are a senior software architect. Analyze the GitLab issue and produce a structured JSON implementation spec.
+          Output ONLY valid JSON:
+          {
+            "summary": "<one-line summary>",
+            "tasks": ["<task1>", "<task2>"],
+            "files": ["<file path>"],
+            "acceptance_criteria": ["<criterion1>"]
+          }
+        user: |
+          Analyze this GitLab issue and produce the implementation spec:
+          {{goal}}
+        placeholder: history
+      unit_primitives: []
+      params:
+        timeout: 120
+
+    - prompt_id: "code_prompt"
+      name: "Code Agent Prompt"
+      prompt_template:
+        system: |
+          You are a senior TypeScript engineer. Generate production-ready TypeScript code from the spec.
+          Separate files with: // FILE: <path>
+          No markdown fences. Fully implemented code only.
+        user: |
+          Generate code for this spec:
+          {{context}}
+        placeholder: history
+      unit_primitives: []
+      params:
+        timeout: 180
+
+    - prompt_id: "security_prompt"
+      name: "Security Agent Prompt"
+      prompt_template:
+        system: |
+          You are an application security expert. Scan the code for OWASP Top 10 vulnerabilities, secrets, and insecure patterns.
+          Output ONLY valid JSON:
+          {
+            "passed": true,
+            "severity": "none",
+            "issues": [],
+            "summary": "<summary>"
+          }
+        user: |
+          Security scan this code:
+          {{context}}
+        placeholder: history
+      unit_primitives: []
+      params:
+        timeout: 120
+
+    - prompt_id: "test_prompt"
+      name: "Test Agent Prompt"
+      prompt_template:
+        system: |
+          You are a senior QA engineer. Write a complete Jest test suite covering all exported functions, edge cases, and error paths.
+          No placeholder tests. Fully implemented only.
+        user: |
+          Write tests for this code using these acceptance criteria:
+          {{context}}
+        placeholder: history
+      unit_primitives: []
+      params:
+        timeout: 180
+
+    - prompt_id: "review_prompt"
+      name: "Review Agent Prompt"
+      prompt_template:
+        system: |
+          You are a principal engineer. Review the code, tests, and security report, then create the MR.
+          Output ONLY valid JSON:
+          {
+            "approved": true,
+            "comments": [],
+            "mr_title": "<title>",
+            "mr_description": "<full markdown description>"
+          }
+        user: |
+          Review and create MR for:
+          {{context}}
+        placeholder: history
+      unit_primitives: []
+      params:
+        timeout: 180
+
+  routers:
+    - from: "spec_agent"
+      to: "code_agent"
+    - from: "code_agent"
+      to: "security_agent"
+    - from: "security_agent"
+      to: "test_agent"
+    - from: "test_agent"
+      to: "review_agent"
+    - from: "review_agent"
+      to: "end"
+
+  flow:
+    entry_point: "spec_agent"

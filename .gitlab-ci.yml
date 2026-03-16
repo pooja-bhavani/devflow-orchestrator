@@ -1,0 +1,24 @@
+stages:
+  - build
+  - test
+
+variables:
+  NODE_VERSION: "20"
+
+build:
+  stage: build
+  image: node:20-alpine
+  script:
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 hour
+
+typecheck:
+  stage: test
+  image: node:20-alpine
+  script:
+    - npm ci
+    - npx tsc --noEmit
