@@ -5,9 +5,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitLab Duo](https://img.shields.io/badge/GitLab%20Duo-Agent%20Platform-fc6d26)](https://docs.gitlab.com/ee/user/gitlab_duo/)
-[![Anthropic Claude](https://img.shields.io/badge/Powered%20by-Anthropic%20Claude-191919)](https://anthropic.com)
-[![Green Agent](https://img.shields.io/badge/Green%20Agent-Token%20Efficient-3fb950)](https://devpost.com/software/devflow-orchestrator)
-
+[![Anthropic Claude](https://img.shields.io/badge/Powered%20by-Anthropic%20Claude-191919)](https://anthropic.com
 ---
 
 ## The Problem
