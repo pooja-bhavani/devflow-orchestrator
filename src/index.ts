@@ -2,10 +2,11 @@ import "dotenv/config"
 import express from "express"
 import { createServer } from "http"
 import { Server as SocketServer } from "socket.io"
-import crypto from "crypto"
 import path from "path"
 import { DevFlowOrchestrator } from "./orchestrator/orchestrator"
 import { registerMetricsHook } from "./orchestrator/orchestrator"
+import { getTotalTokenStats, getTokenUsage, callClaude, getGreenStats } from "./claude"
+import { getIssue } from "./gitlab/gitlabClient"
 
 const app = express()
 const httpServer = createServer(app)
@@ -57,6 +58,65 @@ app.post("/trigger/:issueIid", async (req, res) => {
 
 /** Health check */
 app.get("/health", (_req, res) => res.json({ status: "ok" }))
+
+/** Token usage stats */
+app.get("/stats/tokens", (_req, res) => {
+  res.json({ summary: getTotalTokenStats(), breakdown: getTokenUsage() })
+})
+
+/** 🌱 Green Agent sustainability stats */
+app.get("/stats/green", (_req, res) => {
+  res.json(getGreenStats())
+})
+
+/** 🌱 Green Agent full sustainability report — human-readable */
+app.get("/stats/green/report", (_req, res) => {
+  const stats = getGreenStats()
+  const report = {
+    summary: `This pipeline run used ${stats.total_calls} LLM calls totalling ${stats.total_co2e_g}g CO₂e.`,
+    energy_saved: `Smart model routing saved ~${stats.energy_saved_g}g CO₂e by using Haiku for ${stats.haiku_pct}% of calls instead of always using Sonnet.`,
+    equivalent: `${stats.total_co2e_g}g CO₂e ≈ ${(stats.total_co2e_g / 411).toFixed(5)} km driven in an average car.`,
+    model_breakdown: stats.byModel,
+    insights: stats.insights,
+    routing_policy: "Haiku for inputs <2000 chars (lightweight tasks), Sonnet for complex reasoning only",
+    co2e_methodology: "Estimated based on datacenter PUE ~1.2: Haiku 0.6g/1M tokens, Sonnet 2.4g/1M tokens",
+  }
+  res.json(report)
+})
+
+/** AI Assistant chat — real Claude, analyzes any GitLab issue */
+app.post("/chat", async (req, res) => {
+  const { message, issueIid } = req.body as { message: string; issueIid?: number }
+  if (!message) return res.status(400).json({ error: "message required" })
+
+  try {
+    let context = ""
+    if (issueIid) {
+      try {
+        const issue = await getIssue(issueIid)
+        context = `\n\nGitLab Issue #${issueIid}:\nTitle: ${issue.title}\nDescription: ${issue.description}`
+      } catch { /* issue fetch failed, continue without it */ }
+    }
+
+    const SYSTEM = `You are DevFlow AI, an expert SRE and DevSecOps assistant embedded in the DevFlow Orchestrator dashboard.
+You help engineers understand GitLab issues, diagnose production incidents, and decide whether to run the automated pipeline.
+
+When given an issue, you:
+1. Summarize the problem clearly in 2-3 sentences
+2. List the likely root causes (be specific, not generic)
+3. List affected components/files
+4. Recommend whether to run the pipeline and why
+5. Estimate severity: P0/P1/P2/P3
+
+Keep responses concise and actionable. Use plain text, no markdown headers.`
+
+    const reply = await callClaude(SYSTEM, message + context, "ai-assistant")
+    res.json({ reply })
+  } catch (err: unknown) {
+    const e = err as { message?: string }
+    res.status(500).json({ error: e.message ?? "Claude call failed" })
+  }
+})
 
 /** Push live metrics to all connected dashboards every 5s */
 let _cpu = 94, _mem = 98, _pods = 8, _db = 10, _e5xx = 67, _pipeOk = 0

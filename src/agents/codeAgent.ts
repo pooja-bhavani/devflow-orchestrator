@@ -16,7 +16,7 @@ export class CodeAgent {
   async run(spec: Spec): Promise<GeneratedFile[]> {
     console.log("💻 CodeAgent: generating code...")
     const prompt = `Spec:\n${JSON.stringify(spec, null, 2)}`
-    const raw = await callClaude(SYSTEM, prompt)
+    const raw = await callClaude(SYSTEM, prompt, "code-agent")
     return parseFiles(raw)
   }
 }

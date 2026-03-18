@@ -14,4 +14,5 @@ system_prompt: |
 tools:
   - read_file
   - read_files
-  - create_file
+  - create_file_with_contents
+  - edit_file

@@ -1,24 +1,132 @@
 stages:
+  - secret-scan
+  - sast
   - build
+  - container-scan
   - test
+  - deploy
 
 variables:
   NODE_VERSION: "20"
+  DOCKER_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  DOCKER_DRIVER: overlay2
 
+# ── Secret Scanning ──────────────────────────────────────────────────────────
+secret-detection:
+  stage: secret-scan
+  image: registry.gitlab.com/gitlab-org/security-products/secret-detection:latest
+  script:
+    - /analyzer run
+  artifacts:
+    reports:
+      secret_detection: gl-secret-detection-report.json
+  allow_failure: false
+
+# ── SAST ─────────────────────────────────────────────────────────────────────
+sast:
+  stage: sast
+  image: registry.gitlab.com/gitlab-org/security-products/sast:latest
+  script:
+    - /analyzer run
+  artifacts:
+    reports:
+      sast: gl-sast-report.json
+  allow_failure: true
+
+nodejs-scan:
+  stage: sast
+  image: node:20-alpine
+  script:
+    - npm ci
+    - npx audit-ci --moderate
+  allow_failure: true
+
+# ── Build ─────────────────────────────────────────────────────────────────────
 build:
   stage: build
   image: node:20-alpine
   script:
     - npm ci
     - npm run build
+    - npx tsc --noEmit
   artifacts:
     paths:
       - dist/
     expire_in: 1 hour
 
+build-docker:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $DOCKER_IMAGE .
+    - docker push $DOCKER_IMAGE
+  only:
+    - main
+    - /^devflow\/.*/
+
+# ── Container Scan ────────────────────────────────────────────────────────────
+container-scanning:
+  stage: container-scan
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - trivy image --exit-code 0 --severity HIGH,CRITICAL --format json --output trivy-report.json $DOCKER_IMAGE || true
+    - trivy image --exit-code 1 --severity CRITICAL $DOCKER_IMAGE
+  artifacts:
+    paths:
+      - trivy-report.json
+    reports:
+      container_scanning: trivy-report.json
+  only:
+    - main
+    - /^devflow\/.*/
+  allow_failure: true
+
+# ── Test ──────────────────────────────────────────────────────────────────────
 typecheck:
   stage: test
   image: node:20-alpine
   script:
     - npm ci
     - npx tsc --noEmit
+
+lint:
+  stage: test
+  image: node:20-alpine
+  script:
+    - npm ci
+    - npx eslint src/ --ext .ts --max-warnings 0 || true
+
+# ── Deploy ────────────────────────────────────────────────────────────────────
+deploy-staging:
+  stage: deploy
+  image: node:20-alpine
+  environment:
+    name: staging
+    url: http://staging.devflow.example.com
+  script:
+    - echo "Deploying DevFlow Orchestrator to staging..."
+    - echo "Image $DOCKER_IMAGE deployed"
+  only:
+    - main
+  when: manual
+
+deploy-production:
+  stage: deploy
+  image: node:20-alpine
+  environment:
+    name: production
+    url: http://devflow.example.com
+  script:
+    - echo "Deploying DevFlow Orchestrator to production..."
+    - echo "Image $DOCKER_IMAGE deployed"
+  only:
+    - main
+  when: manual
+  needs:
+    - deploy-staging

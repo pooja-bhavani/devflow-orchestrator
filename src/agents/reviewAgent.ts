@@ -27,7 +27,7 @@ export class ReviewAgent {
     console.log("👁️  ReviewAgent: reviewing code and preparing MR...")
     const codeBlock = codeFiles.map((f) => `// FILE: ${f.path}\n${f.content}`).join("\n\n")
     const prompt = `Security report:\n${JSON.stringify(security, null, 2)}\n\nCode:\n${codeBlock}`
-    const raw = await callClaude(SYSTEM, prompt)
+    const raw = await callClaude(SYSTEM, prompt, "review-agent")
     return JSON.parse(raw) as ReviewResult
   }
 }

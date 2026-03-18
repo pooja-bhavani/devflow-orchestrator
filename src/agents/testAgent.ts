@@ -15,7 +15,7 @@ export class TestAgent {
     console.log("🧪 TestAgent: generating tests...")
     const codeBlock = files.map((f) => `// FILE: ${f.path}\n${f.content}`).join("\n\n")
     const prompt = `Acceptance criteria:\n${spec.acceptance_criteria.join("\n")}\n\nCode:\n${codeBlock}`
-    const raw = await callClaude(SYSTEM, prompt)
+    const raw = await callClaude(SYSTEM, prompt, "test-agent")
     return files.map((f) => ({
       path: f.path.replace(/\.ts$/, ".test.ts").replace("src/", "src/__tests__/"),
       content: raw.trim(),

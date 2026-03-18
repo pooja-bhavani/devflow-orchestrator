@@ -19,7 +19,7 @@ export interface Spec {
 export class SpecAgent {
   async run(issueTitle: string, issueDescription: string): Promise<Spec> {
     console.log("🧠 SpecAgent: analyzing issue...")
-    const raw = await callClaude(SYSTEM, `Issue: ${issueTitle}\n\n${issueDescription}`)
+    const raw = await callClaude(SYSTEM, `Issue: ${issueTitle}\n\n${issueDescription}`, "spec-agent")
     return JSON.parse(raw) as Spec
   }
 }

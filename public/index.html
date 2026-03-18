@@ -8,370 +8,407 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Glassmorphism UI",sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh;padding:1.5rem}
-header{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem}
-header h1{font-size:1.4rem;font-weight:700}
-header p{font-size:0.8rem;color:#8b949e}
-.trigger{display:flex;gap:0.5rem;margin-bottom:1.25rem;align-items:center;flex-wrap:wrap}
-.trigger input{max-width:150px;padding:0.45rem 0.7rem;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:0.85rem}
-.trigger button{padding:0.45rem 1rem;background:#fc6d26;border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:0.85rem}
-.trigger button:hover{background:#e24329}
-.hint{font-size:0.75rem;color:#8b949e}
-
-/* Metrics */
-.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:0.5rem;margin-bottom:1rem}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:linear-gradient(135deg,#0d2137 0%,#0a1f2a 25%,#0d1f1a 60%,#0a1a20 100%);background-attachment:fixed;color:#e6edf3;min-height:100vh;padding:1.25rem}
+.glass{background:rgba(13,21,31,0.55);border:1px solid rgba(255,255,255,0.07);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:10px}
+.layout{display:grid;grid-template-columns:1fr 340px;gap:1rem;align-items:start}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.main-col{display:flex;flex-direction:column;gap:0.85rem}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.header-left h1{font-size:1.35rem;font-weight:700}
+.header-left p{font-size:0.75rem;color:#8b949e;margin-top:0.15rem}
+.hbadge{font-size:0.65rem;padding:0.2rem 0.55rem;border-radius:20px;font-weight:600;border:1px solid;margin-left:0.4rem}
+.hbadge.gl{color:#fc6d26;border-color:#fc6d2640;background:#fc6d2610}
+.hbadge.ai{color:#a78bfa;border-color:#a78bfa40;background:#a78bfa10}
+.trigger-bar{display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;padding:0.75rem 1rem}
+.trigger-bar input{padding:0.4rem 0.65rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#e6edf3;font-size:0.82rem;width:110px}
+.trigger-bar input:focus{outline:none;border-color:#fc6d26}
+.btn-run{padding:0.4rem 1rem;background:#fc6d26;border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:0.82rem}
+.btn-run:hover{background:#e24329}
+.issue-hint{font-size:0.72rem;color:#8b949e;flex:1}
+.gl-link{font-size:0.72rem;color:#79c0ff;text-decoration:none;padding:0.3rem 0.65rem;border:1px solid rgba(121,192,255,0.2);border-radius:6px;background:rgba(121,192,255,0.05)}
+.gl-link:hover{background:rgba(121,192,255,0.1)}
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:0.5rem}
 @media(max-width:800px){.metrics{grid-template-columns:repeat(3,1fr)}}
-.metric{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.6rem;text-align:center}
-.metric .val{font-size:1.4rem;font-weight:700;line-height:1}
-.metric .lbl{font-size:0.65rem;color:#8b949e;margin-top:0.2rem}
+.metric{padding:0.6rem;text-align:center}
+.metric .val{font-size:1.35rem;font-weight:700;line-height:1}
+.metric .lbl{font-size:0.62rem;color:#8b949e;margin-top:0.2rem}
 .metric.crit .val{color:#f85149}.metric.warn .val{color:#d29922}.metric.ok .val{color:#3fb950}
-
-/* Charts */
-.charts{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem}
-@media(max-width:800px){.charts{grid-template-columns:1fr}}
-.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.85rem}
-.card h3{font-size:0.72rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.6rem}
-canvas{max-height:140px}
-
-/* Pipeline */
-.pipeline-title{font-size:0.72rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.5rem}
-.stage-card{border:1px solid #30363d;border-radius:6px;overflow:hidden;margin-bottom:0.4rem;transition:border-color .2s}
-.stage-card.running{border-color:#d29922}
-.stage-card.done{border-color:#3fb950}
-.stage-card.error{border-color:#f85149}
-.stage-header{display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.85rem;background:#161b22;cursor:pointer;user-select:none}
-.stage-header:hover{background:#1c2128}
-.stage-header .icon{font-size:1rem;width:1.3rem;text-align:center}
-.stage-header .label{flex:1;font-size:0.83rem;font-weight:500}
-.stage-header .dur{font-size:0.7rem;color:#8b949e;min-width:3rem;text-align:right}
-.badge{font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:10px;font-weight:700;text-transform:uppercase}
-.badge.running{background:#d2992233;color:#d29922}
-.badge.done{background:#3fb95033;color:#3fb950}
-.badge.error{background:#f8514933;color:#f85149}
-.badge.idle{background:#21262d;color:#8b949e}
-.chevron{font-size:0.75rem;color:#8b949e;transition:transform .2s;margin-left:0.25rem}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem}
+@media(max-width:700px){.charts{grid-template-columns:1fr}}
+.chart-card{padding:0.85rem}
+.chart-card h3{font-size:0.68rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:0.5rem}
+canvas{max-height:130px}
+/* Pipeline graph */
+.pipe-graph-wrap{padding:1rem}
+.pipe-graph-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.pipe-graph-title{font-size:0.68rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em}
+.pipe-status{font-size:0.68rem;padding:0.18rem 0.6rem;border-radius:10px;font-weight:700;background:rgba(255,255,255,0.05);color:#8b949e;border:1px solid rgba(255,255,255,0.08)}
+.pipe-status.running{background:rgba(31,117,203,0.15);color:#79c0ff;border-color:rgba(31,117,203,0.3)}
+.pipe-status.passed{background:rgba(63,185,80,0.15);color:#3fb950;border-color:rgba(63,185,80,0.3)}
+.pipe-status.failed{background:rgba(248,81,73,0.15);color:#f85149;border-color:rgba(248,81,73,0.3)}
+.pipe-graph{display:flex;align-items:center;overflow-x:auto;padding-bottom:1.5rem;gap:0}
+.pg-stage{display:flex;flex-direction:column;align-items:center;gap:0.4rem;min-width:88px;position:relative}
+.pg-arrow{width:28px;height:2px;background:rgba(255,255,255,0.1);flex-shrink:0;margin-top:-20px;transition:background .3s}
+.pg-arrow.done{background:#3fb950}
+.pg-arrow.error{background:#f85149}
+.pg-node{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);transition:all .3s;cursor:pointer}
+.pg-node.idle{border-color:rgba(255,255,255,0.15)}
+.pg-node.running{border-color:#1f75cb;background:rgba(31,117,203,0.15);box-shadow:0 0 0 0 rgba(31,117,203,0.4);animation:pulse 1.4s ease-in-out infinite}
+.pg-node.done{border-color:#3fb950;background:rgba(63,185,80,0.15)}
+.pg-node.error{border-color:#f85149;background:rgba(248,81,73,0.15)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(31,117,203,0.4)}50%{box-shadow:0 0 0 7px rgba(31,117,203,0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pg-label{font-size:0.6rem;color:#8b949e;text-align:center;max-width:82px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-label.running{color:#79c0ff}.pg-label.done{color:#3fb950}.pg-label.error{color:#f85149}
+.pg-dur{font-size:0.57rem;color:#8b949e;text-align:center;min-height:0.8rem}
+.pg-retry{position:absolute;bottom:-1.4rem;left:50%;transform:translateX(-50%);font-size:0.58rem;padding:0.12rem 0.4rem;background:rgba(248,81,73,0.15);border:1px solid rgba(248,81,73,0.35);border-radius:4px;color:#f85149;cursor:pointer;white-space:nowrap;display:none}
+.pg-retry:hover{background:rgba(248,81,73,0.3)}
+/* Job logs */
+.logs-title{font-size:0.68rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:0.4rem}
+.stage-card{border:1px solid rgba(255,255,255,0.06);border-radius:8px;overflow:hidden;margin-bottom:0.35rem;transition:border-color .2s;background:rgba(13,21,31,0.5);backdrop-filter:blur(12px)}
+.stage-card.running{border-color:#1f75cb}.stage-card.done{border-color:#3fb950}.stage-card.error{border-color:#f85149}
+.stage-header{display:flex;align-items:center;gap:0.55rem;padding:0.5rem 0.85rem;cursor:pointer;user-select:none;background:rgba(255,255,255,0.02)}
+.stage-header:hover{background:rgba(255,255,255,0.04)}
+.stage-header .icon{font-size:0.95rem;width:1.2rem;text-align:center}
+.stage-header .label{flex:1;font-size:0.8rem;font-weight:500}
+.stage-header .dur{font-size:0.68rem;color:#8b949e;min-width:2.8rem;text-align:right}
+.badge{font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:10px;font-weight:700;text-transform:uppercase}
+.badge.running{background:#1f75cb33;color:#79c0ff}.badge.done{background:#3fb95033;color:#3fb950}
+.badge.error{background:#f8514933;color:#f85149}.badge.idle{background:rgba(255,255,255,0.05);color:#8b949e}
+.chevron{font-size:0.72rem;color:#8b949e;transition:transform .2s;margin-left:0.2rem}
 .chevron.open{transform:rotate(90deg)}
-
-/* GitLab CI runner-style log */
-.stage-log{display:none;background:#0a0c10;border-top:1px solid #21262d;max-height:340px;overflow-y:auto;font-family:"SFMono-Regular",Consolas,monospace;font-size:0.71rem;line-height:1.75}
+.stage-log{display:none;background:#060810;border-top:1px solid rgba(255,255,255,0.05);max-height:320px;overflow-y:auto;font-family:"SFMono-Regular",Consolas,monospace;font-size:0.7rem;line-height:1.7}
 .stage-log.open{display:block}
-
-/* Section header — green bold like GitLab */
-.log-sec{display:flex;align-items:center;padding:0.18rem 0.6rem;background:#0d2818;border-top:1px solid #1a3a25;border-bottom:1px solid #1a3a25;color:#3fb950;font-weight:700;gap:0.4rem}
-.log-sec .sec-dur{margin-left:auto;color:#3d6b4a;font-weight:400;font-size:0.68rem}
-
-/* Log line: linenum | timestamp | text */
-.ll{display:flex;min-height:1.3em}
-.ll .n{color:#3d444d;min-width:3.5rem;padding:0 0.5rem;text-align:right;user-select:none;flex-shrink:0;border-right:1px solid #161b22}
-.ll .t{color:#3d444d;min-width:6.5rem;padding:0 0.5rem;flex-shrink:0}
-.ll .m{flex:1;padding:0 0.5rem;word-break:break-all;white-space:pre-wrap}
-.ll.tool .m{color:#79c0ff}
-.ll.ok   .m{color:#3fb950}
-.ll.ai   .m{color:#e6edf3}
-.ll.dim  .m{color:#8b949e}
-.ll.err  .m{color:#f85149;font-weight:600}
-.ll.warn .m{color:#d29922}
-.ll.pass .m{color:#3fb950;font-weight:700}
-.ll.cmd  .m{color:#e6edf3}
-.ll.cmd  .m::before{content:"$ ";color:#3fb950}
-
-.cursor{display:inline-block;width:6px;height:11px;background:#d29922;animation:blink 1s step-end infinite;vertical-align:middle;margin-left:2px}
+.log-sec{display:flex;align-items:center;padding:0.15rem 0.6rem;background:#0d2818;border-top:1px solid #1a3a25;border-bottom:1px solid #1a3a25;color:#3fb950;font-weight:700;gap:0.4rem;font-size:0.7rem}
+.log-sec .sec-dur{margin-left:auto;color:#3d6b4a;font-weight:400;font-size:0.65rem}
+.ll{display:flex;min-height:1.25em}
+.ll .n{color:#3d444d;min-width:3.2rem;padding:0 0.45rem;text-align:right;user-select:none;flex-shrink:0;border-right:1px solid #0d1117}
+.ll .t{color:#3d444d;min-width:6rem;padding:0 0.45rem;flex-shrink:0}
+.ll .m{flex:1;padding:0 0.45rem;word-break:break-all;white-space:pre-wrap}
+.ll.tool .m{color:#79c0ff}.ll.ok .m{color:#3fb950}.ll.dim .m{color:#8b949e}
+.ll.err .m{color:#f85149;font-weight:600}.ll.warn .m{color:#d29922}.ll.pass .m{color:#3fb950;font-weight:700}
+.cursor{display:inline-block;width:6px;height:10px;background:#d29922;animation:blink 1s step-end infinite;vertical-align:middle;margin-left:2px}
 @keyframes blink{50%{opacity:0}}
-
-.powered{font-size:0.72rem;color:#8b949e;margin-top:1rem}
-.powered span{color:#fc6d26;font-weight:600}
+/* AI panel */
+.ai-panel{display:flex;flex-direction:column;height:calc(100vh - 5rem);position:sticky;top:1.25rem}
+.ai-header{padding:0.75rem 1rem 0.5rem;border-bottom:1px solid rgba(255,255,255,0.07)}
+.ai-header h2{font-size:0.85rem;font-weight:700}
+.ai-header p{font-size:0.68rem;color:#8b949e;margin-top:0.1rem}
+.ai-messages{flex:1;overflow-y:auto;padding:0.75rem;display:flex;flex-direction:column;gap:0.6rem;min-height:0}
+.ai-msg{padding:0.55rem 0.75rem;border-radius:8px;font-size:0.75rem;line-height:1.55;max-width:100%;word-break:break-word}
+.ai-msg.user{background:rgba(252,109,38,0.12);border:1px solid rgba(252,109,38,0.2);align-self:flex-end;color:#e6edf3}
+.ai-msg.bot{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);align-self:flex-start;color:#c9d1d9}
+.ai-msg.thinking{color:#8b949e;font-style:italic}
+.ai-input-row{display:flex;gap:0.4rem;padding:0.65rem 0.75rem;border-top:1px solid rgba(255,255,255,0.07)}
+.ai-input-row input{flex:1;padding:0.45rem 0.65rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#e6edf3;font-size:0.78rem}
+.ai-input-row input:focus{outline:none;border-color:#a78bfa}
+.ai-input-row input::placeholder{color:#8b949e}
+.btn-send{padding:0.45rem 0.75rem;background:#a78bfa;border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:0.78rem}
+.btn-send:hover{background:#9061f9}.btn-send:disabled{background:#4a3a6a;cursor:not-allowed}
+.ai-run-btn{width:100%;margin:0.4rem 0 0;padding:0.4rem;background:rgba(252,109,38,0.15);border:1px solid rgba(252,109,38,0.3);border-radius:6px;color:#fc6d26;font-size:0.72rem;font-weight:600;cursor:pointer}
+.ai-run-btn:hover{background:rgba(252,109,38,0.25)}
 </style>
 </head>
 <body>
-
 <header>
-  <div><h1>DevFlow Orchestrator</h1><p>DevOps and Cloud Engineer  · GitLab Duo Agent Platform · Anthropic Claude</p></div>
+  <div class="header-left" style="display:flex;align-items:center;gap:0.75rem">
+    <svg width="46" height="46" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;display:block">
+      <defs>
+        <linearGradient id="hg" x1="0" y1="0" x2="46" y2="46" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#fc6d26"/>
+          <stop offset="100%" stop-color="#a78bfa"/>
+        </linearGradient>
+        <linearGradient id="ng" x1="16" y1="16" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#fc6d26"/>
+          <stop offset="100%" stop-color="#a78bfa"/>
+        </linearGradient>
+      </defs>
+      <polygon points="23,2 42,12.5 42,33.5 23,44 4,33.5 4,12.5" fill="rgba(255,255,255,0.04)" stroke="url(#hg)" stroke-width="1.6"/>
+      <circle cx="4" cy="23" r="3" fill="#fc6d26"/>
+      <circle cx="42" cy="23" r="3" fill="#a78bfa"/>
+      <line x1="7" y1="23" x2="15" y2="23" stroke="#fc6d26" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="31" y1="23" x2="39" y2="23" stroke="#a78bfa" stroke-width="1.8" stroke-linecap="round"/>
+      <polyline points="28,20 31,23 28,26" stroke="#a78bfa" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="23" y1="16" x2="23" y2="8" stroke="#3fb950" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="2 2.5"/>
+      <circle cx="23" cy="7" r="2" fill="#3fb950"/>
+      <line x1="23" y1="30" x2="23" y2="38" stroke="#79c0ff" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="2 2.5"/>
+      <circle cx="23" cy="39" r="2" fill="#79c0ff"/>
+      <circle cx="23" cy="23" r="7.5" fill="url(#ng)"/>
+      <circle cx="23" cy="23" r="5" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+      <circle cx="23" cy="23" r="2.2" fill="#fff"/>
+    </svg>
+    <div>
+      <h1>DevFlow Orchestrator</h1>
+      <p>GitLab Duo Agent Platform &nbsp;·&nbsp; Anthropic Claude &nbsp;·&nbsp; AI-Powered DevSecOps</p>
+    </div>
+  </div>
+  <div>
+    <span class="hbadge gl">GitLab Duo</span>
+    <span class="hbadge ai">Claude AI</span>
+  </div>
 </header>
+<div class="layout">
+<div class="main-col">
 
-<div class="trigger">
-  <input id="issueInput" type="number" placeholder="Issue IID" min="1" value="3"/>
-  <button onclick="triggerPipeline()">▶ Run Pipeline</button>
-  <span class="hint">Issue #3 — PROD: BankApp CrashLoopBackOff + OOMKilled + CVEs</span>
+<!-- trigger -->
+<div class="glass">
+  <div class="trigger-bar">
+    <input id="issueInput" type="number" placeholder="Issue IID" min="1" value="1"/>
+    <button class="btn-run" onclick="triggerPipeline()">&#9654; Run Pipeline</button>
+    <span class="issue-hint" id="issueHint">Enter any GitLab issue IID</span>
+    <a class="gl-link" href="https://gitlab.com/gitlab-ai-hackathon/participants/23075558/-/issues" target="_blank">&#128279; Browse Issues</a>
+  </div>
 </div>
 
-<div class="metrics">
-  <div class="metric crit"><div class="val" id="m-cpu">94%</div><div class="lbl">CPU Usage</div></div>
-  <div class="metric crit"><div class="val" id="m-mem">98%</div><div class="lbl">Memory</div></div>
-  <div class="metric crit"><div class="val" id="m-pods">8</div><div class="lbl">Pod Restarts</div></div>
-  <div class="metric crit"><div class="val" id="m-db">10/10</div><div class="lbl">DB Connections</div></div>
-  <div class="metric crit"><div class="val" id="m-5xx">67%</div><div class="lbl">HTTP 5xx</div></div>
-  <div class="metric crit"><div class="val" id="m-pipe">0%</div><div class="lbl">Pipeline OK</div></div>
+<!-- metrics -->
+<div class="glass" style="padding:0.75rem">
+  <div class="metrics">
+    <div class="metric crit"><div class="val" id="m-cpu">94%</div><div class="lbl">CPU</div></div>
+    <div class="metric crit"><div class="val" id="m-mem">98%</div><div class="lbl">Memory</div></div>
+    <div class="metric crit"><div class="val" id="m-pods">8</div><div class="lbl">Pod Restarts</div></div>
+    <div class="metric crit"><div class="val" id="m-db">10/10</div><div class="lbl">DB Conns</div></div>
+    <div class="metric crit"><div class="val" id="m-5xx">67%</div><div class="lbl">HTTP 5xx</div></div>
+    <div class="metric crit"><div class="val" id="m-pipe">0%</div><div class="lbl">Pipeline OK</div></div>
+  </div>
 </div>
 
+<!-- charts -->
 <div class="charts">
-  <div class="card"><h3>CPU &amp; Memory %</h3><canvas id="cCpuMem"></canvas></div>
-  <div class="card"><h3>Pod Restarts &amp; HTTP 5xx %</h3><canvas id="cPods"></canvas></div>
+  <div class="glass chart-card"><h3>CPU &amp; Memory %</h3><canvas id="cCpuMem"></canvas></div>
+  <div class="glass chart-card"><h3>Pod Restarts &amp; HTTP 5xx</h3><canvas id="cPods"></canvas></div>
 </div>
 
-<div class="pipeline-title">Pipeline Stages</div>
+<!-- GitLab-style pipeline graph -->
+<div class="glass pipe-graph-wrap">
+  <div class="pipe-graph-header">
+    <span class="pipe-graph-title">Pipeline</span>
+    <span class="pipe-status" id="pipe-status">idle</span>
+  </div>
+  <div class="pipe-graph" id="pipe-graph"></div>
+</div>
+
+<!-- job logs -->
+<div class="logs-title">Job Logs</div>
 <div id="pipeline"></div>
 
-<div class="powered">Powered by <span>GitLab Duo Agent Platform</span> + <span>Anthropic Claude</span></div>
+<div style="font-size:0.68rem;color:#8b949e;margin-top:0.25rem">Powered by <span style="color:#fc6d26;font-weight:600">GitLab Duo Agent Platform</span> + <span style="color:#a78bfa;font-weight:600">Anthropic Claude</span></div>
+<div class="glass" style="margin-top:0.5rem;padding:0.6rem 0.85rem;font-size:0.72rem;color:#8b949e;display:flex;gap:1rem;flex-wrap:wrap;align-items:center">
+  <span style="color:#3fb950;font-weight:700">&#127807; Green Agent</span>
+  <span>CO&#8322;e: <b id="g-co2" style="color:#3fb950">0.0000g</b></span>
+  <span>Haiku calls: <b id="g-haiku" style="color:#3fb950">0%</b></span>
+  <span>Sonnet calls: <b id="g-sonnet" style="color:#d29922">0%</b></span>
+  <span title="% of calls routed to low-energy Haiku model">&#9889; Energy saved by smart routing</span>
+</div>
+<div class="glass" style="margin-top:0.5rem;padding:0.6rem 0.85rem;font-size:0.72rem;color:#8b949e;display:flex;gap:1rem;flex-wrap:wrap">
+  <span>Token Usage</span>
+  <span>Total: <b id="t-total" style="color:#e6edf3">0</b></span>
+  <span>Input: <b id="t-in" style="color:#e6edf3">0</b></span>
+  <span>Output: <b id="t-out" style="color:#e6edf3">0</b></span>
+  <span>Est. cost: <b id="t-cost" style="color:#3fb950">$0.00000</b></span>
+</div>
+</div><!-- end main-col -->
 
+<!-- AI panel -->
+<div class="glass ai-panel">
+  <div class="ai-header">
+    <h2>&#129302; DevFlow AI Assistant</h2>
+    <p>Paste an issue description or type issue #IID</p>
+  </div>
+  <div class="ai-messages" id="aiMessages">
+    <div class="ai-msg bot">Hey! Type "analyze issue #3" or paste any issue description — I'll diagnose root causes and you can run the pipeline with one click.</div>
+  </div>
+  <div style="padding:0 0.75rem">
+    <button class="ai-run-btn" id="aiRunBtn" style="display:none" onclick="runFromAI()">&#9654; Run Pipeline for this issue</button>
+  </div>
+  <div class="ai-input-row">
+    <input id="aiInput" type="text" placeholder="Describe issue or type issue #IID..." onkeydown="if(event.key==='Enter')sendChat()"/>
+    <button class="btn-send" id="aiSendBtn" onclick="sendChat()">Send</button>
+  </div>
+</div>
+</div><!-- end layout -->
 <script>
-// ── Stage definitions ────────────────────────────────────────────────────────
-const STAGES = [
-  {key:"init",         icon:"📋" ,label:"Fetch Issue from GitLab"},
-  {key:"duo_workflow", icon:"🦾",label:"Trigger GitLab Duo Agent Workflow"},
-  {key:"polling",      icon:"⚙️",label:"Agents Running — Diagnose → Fix → Security → Test → Deploy → Monitor"},
-  {key:"done",         icon:"✅",label:"Pipeline Complete — MR Created"},
-  {key:"failed",       icon:"🔴",label:"Pipeline Failed"},
+const STAGES=[
+  {key:"init",        label:"Fetch Issue",    job:"fetch-issue"},
+  {key:"duo_workflow",label:"RCA + Spec",     job:"rca-and-spec"},
+  {key:"polling",     label:"Agent Pipeline", job:"agent-pipeline"},
+  {key:"done",        label:"Complete",       job:"create-mr"},
 ]
+const stageLineNum={},stageIsOpen={},stageStartMs={}
 
-const stageLineNum = {}
-const stageIsOpen  = {}
-const stageStartMs = {}
-
-// ── Build pipeline cards ─────────────────────────────────────────────────────
-function buildPipeline() {
-  document.getElementById("pipeline").innerHTML = STAGES.map(s => `
-    <div class="stage-card" id="card-${s.key}">
-      <div class="stage-header" onclick="toggle('${s.key}')">
-        <span class="icon">${s.icon}</span>
-        <span class="label">${s.label}</span>
-        <span class="dur" id="dur-${s.key}"></span>
-        <span class="badge idle" id="badge-${s.key}">idle</span>
-        <span class="chevron" id="chev-${s.key}">›</span>
-      </div>
-      <div class="stage-log" id="log-${s.key}"></div>
-    </div>`).join("")
-  STAGES.forEach(s => { stageLineNum[s.key] = 1; stageIsOpen[s.key] = false })
+function svgIcon(status){
+  if(status==="running")return'<svg width="18" height="18" viewBox="0 0 18 18" style="animation:spin 1s linear infinite"><circle cx="9" cy="9" r="6.5" stroke="#79c0ff" stroke-width="2" fill="none" stroke-dasharray="30" stroke-dashoffset="10"/></svg>'
+  if(status==="done")return'<svg width="18" height="18" viewBox="0 0 18 18"><polyline points="4,9 7.5,13 14,5" stroke="#3fb950" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  if(status==="error")return'<svg width="18" height="18" viewBox="0 0 18 18"><line x1="5" y1="5" x2="13" y2="13" stroke="#f85149" stroke-width="2.2" stroke-linecap="round"/><line x1="13" y1="5" x2="5" y2="13" stroke="#f85149" stroke-width="2.2" stroke-linecap="round"/></svg>'
+  return'<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="5" stroke="rgba(255,255,255,0.2)" stroke-width="2" fill="none"/></svg>'
 }
 
-function toggle(key) {
-  stageIsOpen[key] = !stageIsOpen[key]
-  document.getElementById("log-"  + key).classList.toggle("open",  stageIsOpen[key])
-  document.getElementById("chev-" + key).classList.toggle("open", stageIsOpen[key])
-}
-
-function openOnly(key) {
-  STAGES.forEach(s => {
-    if (s.key !== key && stageIsOpen[s.key]) toggle(s.key)
+function buildGraph(){
+  const g=document.getElementById("pipe-graph");g.innerHTML=""
+  STAGES.forEach((s,i)=>{
+    if(i>0){const a=document.createElement("div");a.className="pg-arrow";a.id="arr-"+s.key;g.appendChild(a)}
+    const w=document.createElement("div");w.className="pg-stage"
+    w.innerHTML=`<div class="pg-node idle" id="pgn-${s.key}" onclick="toggle('${s.key}')" title="${s.label}">${svgIcon("idle")}</div><div class="pg-label" id="pgl-${s.key}">${s.label}</div><div class="pg-dur" id="pgd-${s.key}"></div><button class="pg-retry" id="pgr-${s.key}" onclick="retryFromGraph('${s.key}')">Run again</button>`
+    g.appendChild(w)
   })
-  if (!stageIsOpen[key]) toggle(key)
 }
 
-// ── Stage status ─────────────────────────────────────────────────────────────
-function setStage(key, status) {
-  const card  = document.getElementById("card-"  + key)
-  const badge = document.getElementById("badge-" + key)
-  if (!card) return
-  card.className  = "stage-card " + status
-  badge.className = "badge " + status
-  badge.textContent = status
-  if (status === "running" && !stageStartMs[key]) {
-    stageStartMs[key] = Date.now()
-    openOnly(key)
+function updateGraph(key,status){
+  const node=document.getElementById("pgn-"+key);if(!node)return
+  node.className="pg-node "+status
+  node.innerHTML=svgIcon(status)
+  const lbl=document.getElementById("pgl-"+key);if(lbl)lbl.className="pg-label "+status
+  const retry=document.getElementById("pgr-"+key);if(retry)retry.style.display=status==="error"?"block":"none"
+  const arr=document.getElementById("arr-"+key)
+  if(arr)arr.className="pg-arrow"+(status==="done"?" done":status==="error"?" error":"")
+  const ps=document.getElementById("pipe-status")
+  if(status==="running"){ps.className="pipe-status running";ps.textContent="running"}
+  if(status==="done"&&key==="done"){ps.className="pipe-status passed";ps.textContent="passed"}
+  if(status==="error"){ps.className="pipe-status failed";ps.textContent="failed"}
+}
+
+function buildPipeline(){
+  const fi=STAGES.findIndex(s=>s.key==="failed");if(fi>-1)STAGES.splice(fi,1)
+  buildGraph()
+  document.getElementById("pipeline").innerHTML=STAGES.map(s=>`<div class="stage-card" id="card-${s.key}"><div class="stage-header" onclick="toggle('${s.key}')"><span class="label">${s.label}</span><span class="dur" id="dur-${s.key}"></span><span class="badge idle" id="badge-${s.key}">idle</span><span class="chevron" id="chev-${s.key}">&#8250;</span></div><div class="stage-log" id="log-${s.key}"></div></div>`).join("")
+  STAGES.forEach(s=>{stageLineNum[s.key]=1;stageIsOpen[s.key]=false;stageStartMs[s.key]=0})
+  Object.keys(headerDone).forEach(k=>delete headerDone[k])
+}
+
+function toggle(key){stageIsOpen[key]=!stageIsOpen[key];document.getElementById("log-"+key).classList.toggle("open",stageIsOpen[key]);document.getElementById("chev-"+key).classList.toggle("open",stageIsOpen[key])}
+function openOnly(key){STAGES.forEach(s=>{if(s.key!==key&&stageIsOpen[s.key])toggle(s.key)});if(!stageIsOpen[key])toggle(key)}
+
+function setStage(key,status){
+  const card=document.getElementById("card-"+key),badge=document.getElementById("badge-"+key);if(!card)return
+  card.className="stage-card "+status;badge.className="badge "+status;badge.textContent=status
+  if(status==="running"&&!stageStartMs[key]){stageStartMs[key]=Date.now();openOnly(key)}
+  if((status==="done"||status==="error")&&stageStartMs[key]){
+    const d=((Date.now()-stageStartMs[key])/1000).toFixed(0)+"s"
+    document.getElementById("dur-"+key).textContent=d
+    const pgd=document.getElementById("pgd-"+key);if(pgd)pgd.textContent=d
   }
-  if ((status === "done" || status === "error") && stageStartMs[key]) {
-    document.getElementById("dur-" + key).textContent =
-      ((Date.now() - stageStartMs[key]) / 1000).toFixed(0) + "s"
-  }
+  updateGraph(key,status)
 }
 
-// ── Append a log line to a stage ─────────────────────────────────────────────
-function ts() {
-  const d = new Date()
-  return String(d.getHours()).padStart(2,"0") + ":" +
-         String(d.getMinutes()).padStart(2,"0") + ":" +
-         String(d.getSeconds()).padStart(2,"0")
+function retryFromGraph(key){
+  const iid=document.getElementById("issueInput").value;if(!iid)return
+  buildPipeline();resetMetrics()
+  fetch("/trigger/"+iid,{method:"POST"})
 }
 
-function appendLog(key, text, type) {
-  const log = document.getElementById("log-" + key)
-  if (!log) return
+function ts(){const d=new Date();return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")+":"+String(d.getSeconds()).padStart(2,"0")}
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function classify(msg){
+  if(/error|fail|killed|crash|oom|FAILED/i.test(msg))return"err"
+  if(/PASSED|succeeded|fixed|resolved|generated|approved|created/i.test(msg))return"ok"
+  if(/warn|cve|critical|high|violation|missing/i.test(msg))return"warn"
+  if(/File:|Test:|Deploy|Rollback|Comment:|MR title:|Affected|Fix step|Root cause/i.test(msg))return"tool"
+  return"dim"
+}
+function appendLog(key,text,type){
+  const log=document.getElementById("log-"+key);if(!log)return
   log.querySelector(".cursor")?.remove()
-  const ll = document.createElement("div")
-  ll.className = "ll " + (type || classify(text))
-  ll.innerHTML = `<span class="n">${stageLineNum[key]++}</span><span class="t">${ts()}</span><span class="m">${esc(text)}<span class="cursor"></span></span>`
-  log.appendChild(ll)
-  log.scrollTop = log.scrollHeight
+  const ll=document.createElement("div");ll.className="ll "+(type||classify(text))
+  ll.innerHTML=`<span class="n">${stageLineNum[key]++}</span><span class="t">${ts()}</span><span class="m">${esc(text)}<span class="cursor"></span></span>`
+  log.appendChild(ll);log.scrollTop=log.scrollHeight
+}
+function appendSection(key,title,dur){
+  const log=document.getElementById("log-"+key);if(!log)return
+  const sec=document.createElement("div");sec.className="log-sec"
+  sec.innerHTML=`<span>&#9654; ${esc(title)}</span>${dur?`<span class="sec-dur">${dur}</span>`:""}`
+  log.appendChild(sec);log.scrollTop=log.scrollHeight
+}
+function injectRunnerHeader(key,jobName){
+  const iid=document.getElementById("issueInput").value||"?",sha=Math.random().toString(16).slice(2,10)
+  const rid=["YKxHNyexq","ns46NMmJT","s_85d7af18","mR3kPqXwZ"][Math.floor(Math.random()*4)]
+  appendSection(key,"Preparing the runner")
+  appendLog(key,"Running with gitlab-runner 18.10.0 on green-2.saas-linux-small-amd64.runners-manager.gitlab.com/default "+rid,"dim")
+  appendLog(key,"feature flags: FF_USE_GIT_PROACTIVE_AUTH:true","dim")
+  appendSection(key,'Preparing the "docker+machine" executor',"00:02")
+  appendLog(key,"Using Docker executor with image workflow-generic-image:v0.0.6","dim")
+  appendSection(key,"Getting source from Git repository","00:02")
+  appendLog(key,"Checking out "+sha+" as detached HEAD (ref is devflow/fix/issue-"+iid+")...","dim")
+  appendSection(key,'Executing "'+jobName+'" stage of the job script')
 }
 
-function appendSection(key, title, dur) {
-  const log = document.getElementById("log-" + key)
-  if (!log) return
-  const sec = document.createElement("div")
-  sec.className = "log-sec"
-  sec.innerHTML = `<span>▶ ${esc(title)}</span>${dur ? `<span class="sec-dur">${dur}</span>` : ""}`
-  log.appendChild(sec)
-  log.scrollTop = log.scrollHeight
+const LABELS=["T-10m","T-8m","T-6m","T-4m","T-2m","Now"]
+const iCpu=[72,78,85,90,94,94],iMem=[60,72,85,94,98,98],iR=[0,1,2,4,6,8],i5=[2,8,20,40,60,67]
+let cpuChart,podsChart
+function mkChart(id,ds){return new Chart(document.getElementById(id).getContext("2d"),{type:"line",data:{labels:LABELS,datasets:ds},options:{responsive:true,maintainAspectRatio:true,animation:{duration:800},plugins:{legend:{labels:{color:"#8b949e",font:{size:9}}}},scales:{x:{ticks:{color:"#8b949e",font:{size:8}},grid:{color:"rgba(255,255,255,0.04)"}},y:{ticks:{color:"#8b949e",font:{size:8}},grid:{color:"rgba(255,255,255,0.04)"}}}}})}
+function initCharts(){
+  cpuChart=mkChart("cCpuMem",[{label:"CPU %",data:[...iCpu],borderColor:"#f85149",backgroundColor:"#f8514918",tension:.4,fill:true},{label:"Memory %",data:[...iMem],borderColor:"#d29922",backgroundColor:"#d2992218",tension:.4,fill:true}])
+  podsChart=mkChart("cPods",[{label:"Pod Restarts",data:[...iR],borderColor:"#f85149",backgroundColor:"#f8514918",tension:.4,fill:true},{label:"HTTP 5xx %",data:[...i5],borderColor:"#d29922",backgroundColor:"#d2992218",tension:.4,fill:true}])
 }
-
-function classify(msg) {
-  if (msg.startsWith("❌") || /error|fail|killed|crash|exception|oom/i.test(msg)) return "err"
-  if (msg.startsWith("✅") || msg.startsWith("✏️") || /succeeded|fixed|resolved|applied|created|updated|written/i.test(msg)) return "ok"
-  if (msg.startsWith("⚠️") || /warn|cve|critical|high|missing|exhausted|blocking/i.test(msg)) return "warn"
-  if (msg.startsWith("🔧") || msg.startsWith("🔍") || msg.startsWith("📖") || msg.startsWith("📁") || msg.startsWith("🌿") || msg.startsWith("🔀")) return "tool"
-  if (msg.startsWith("🚀") || msg.startsWith("🤖")) return "think"
-  if (msg.startsWith("$")) return "cmd"
-  return "dim"
-}
-function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") }
-
-// ── Inject GitLab-runner style boot lines for a stage ────────────────────────
-function injectRunnerHeader(key, jobName) {
-  const runnerIds = {
-    init:         "YKxHNyexq",
-    duo_workflow: "ns46NMmJT",
-    polling:      "s_85d7af18",
-    done:         "YKxHNyexq",
-    failed:       "ns46NMmJT",
-  }
-  const rid = runnerIds[key] || "YKxHNyexq"
-  appendSection(key, "Preparing the runner")
-  appendLog(key, `Running with gitlab-runner 18.10.0 on green-2.saas-linux-small-amd64.runners-manager.gitlab.com/default ${rid}`, "dim")
-  appendLog(key, `feature flags: FF_USE_GIT_PROACTIVE_AUTH:true`, "dim")
-  appendSection(key, "Preparing the \"docker+machine\" executor", "00:02")
-  appendLog(key, `Using Docker executor with image registry.gitlab.com/gitlab-org/duo-workflow/default-docker-image/workflow-generic-image:v0.0.6`, "dim")
-  appendLog(key, `Pulling docker image workflow-generic-image:v0.0.6 ...`, "tool")
-  appendSection(key, "Getting source from Git repository", "00:02")
-  appendLog(key, `Fetching changes with git depth set to 20...`, "dim")
-  appendLog(key, `Initialized empty Git repository in /builds/gitlab-ai-hackathon/participants/23075558/.git/`, "dim")
-  appendLog(key, `Checking out 05b7e56c as detached HEAD (ref is devflow/fix/issue-3-prod-incident)...`, "dim")
-  appendSection(key, `Executing "${jobName}" stage of the job script`)
-}
-
-// ── Charts ───────────────────────────────────────────────────────────────────
-const LABELS = ["T-10m","T-8m","T-6m","T-4m","T-2m","Now"]
-const iCpu=[72,78,85,90,94,94], fCpu=[94,80,60,45,35,28]
-const iMem=[60,72,85,94,98,98], fMem=[98,75,55,42,38,35]
-const iR=[0,1,2,4,6,8],         fR=[8,8,8,8,8,8]
-const i5=[2,8,20,40,60,67],     f5=[67,50,30,10,2,0]
-let cpuChart, podsChart
-
-function mkChart(id, ds) {
-  return new Chart(document.getElementById(id).getContext("2d"),{
-    type:"line", data:{labels:LABELS, datasets:ds},
-    options:{responsive:true,maintainAspectRatio:true,animation:{duration:800},
-      plugins:{legend:{labels:{color:"#8b949e",font:{size:10}}}},
-      scales:{x:{ticks:{color:"#8b949e",font:{size:9}},grid:{color:"#21262d"}},
-              y:{ticks:{color:"#8b949e",font:{size:9}},grid:{color:"#21262d"}}}}
-  })
-}
-
-function initCharts() {
-  cpuChart  = mkChart("cCpuMem",[
-    {label:"CPU %",    data:[...iCpu],borderColor:"#f85149",backgroundColor:"#f8514922",tension:.4,fill:true},
-    {label:"Memory %", data:[...iMem],borderColor:"#d29922", backgroundColor:"#d2992222",tension:.4,fill:true},
-  ])
-  podsChart = mkChart("cPods",[
-    {label:"Pod Restarts",data:[...iR],borderColor:"#f85149",backgroundColor:"#f8514922",tension:.4,fill:true},
-    {label:"HTTP 5xx %",  data:[...i5],borderColor:"#d29922", backgroundColor:"#d2992222",tension:.4,fill:true},
-  ])
-}
-
-function animateRecovery() {
-  let i=0
-  const iv=setInterval(()=>{
-    if(i>=6){clearInterval(iv);return}
-    cpuChart.data.datasets[0].data  = fCpu.map((v,j)=>j<=i?v:iCpu[j])
-    cpuChart.data.datasets[1].data  = fMem.map((v,j)=>j<=i?v:iMem[j])
-    podsChart.data.datasets[0].data = fR.map((v,j)=>j<=i?v:iR[j])
-    podsChart.data.datasets[1].data = f5.map((v,j)=>j<=i?v:i5[j])
-    cpuChart.update(); podsChart.update()
-    if(i>=3){
-      document.getElementById("m-cpu").textContent  = fCpu[i]+"%"
-      document.getElementById("m-mem").textContent  = fMem[i]+"%"
-      document.getElementById("m-5xx").textContent  = f5[i]+"%"
-      document.getElementById("m-db").textContent   = "3/10"
-      document.getElementById("m-pipe").textContent = "100%"
-      document.querySelectorAll(".metric").forEach(m=>{m.classList.remove("crit","warn");m.classList.add("ok")})
-    }
-    i++
-  },1200)
-}
-
-function resetMetrics() {
-  ["m-cpu","m-mem","m-pods","m-db","m-5xx","m-pipe"].forEach((id,i)=>{
-    document.getElementById(id).textContent=["94%","98%","8","10/10","67%","0%"][i]
-  })
+function resetMetrics(){
+  ["m-cpu","m-mem","m-pods","m-db","m-5xx","m-pipe"].forEach((id,i)=>{document.getElementById(id).textContent=["94%","98%","8","10/10","67%","0%"][i]})
   document.querySelectorAll(".metric").forEach(m=>{m.classList.remove("ok","warn");m.classList.add("crit")})
-  cpuChart.data.datasets[0].data=[...iCpu]; cpuChart.data.datasets[1].data=[...iMem]; cpuChart.update()
-  podsChart.data.datasets[0].data=[...iR];  podsChart.data.datasets[1].data=[...i5];  podsChart.update()
+  cpuChart.data.datasets[0].data=[...iCpu];cpuChart.data.datasets[1].data=[...iMem];cpuChart.update()
+  podsChart.data.datasets[0].data=[...iR];podsChart.data.datasets[1].data=[...i5];podsChart.update()
+  STAGES.forEach(s=>{updateGraph(s.key,"idle");const pgd=document.getElementById("pgd-"+s.key);if(pgd)pgd.textContent=""})
+  const ps=document.getElementById("pipe-status");ps.className="pipe-status";ps.textContent="idle"
 }
 
-// ── Trigger ──────────────────────────────────────────────────────────────────
-async function triggerPipeline() {
-  const iid = document.getElementById("issueInput").value
-  if (!iid) return alert("Enter a GitLab Issue IID")
-  buildPipeline(); resetMetrics()
-  await fetch(`/trigger/${iid}`, {method:"POST"})
+let _lastIid=null
+async function triggerPipeline(){
+  const iid=document.getElementById("issueInput").value;if(!iid)return alert("Enter a GitLab Issue IID")
+  buildPipeline();resetMetrics()
+  document.getElementById("issueHint").textContent="Issue #"+iid+" - fetching from GitLab..."
+  document.getElementById("aiRunBtn").style.display="none"
+  await fetch("/trigger/"+iid,{method:"POST"})
 }
+function runFromAI(){const iid=document.getElementById("issueInput").value||_lastIid;if(iid){document.getElementById("issueInput").value=iid;triggerPipeline()}}
 
-// ── Socket — map events to stage logs ────────────────────────────────────────
-const socket = io()
-
-// Live metrics — auto-update without any refresh
-socket.on("metrics:update", ({cpu, mem, pods, db, e5xx, pipeOk}) => {
-  document.getElementById("m-cpu").textContent  = cpu + "%"
-  document.getElementById("m-mem").textContent  = mem + "%"
-  document.getElementById("m-pods").textContent = pods
-  document.getElementById("m-db").textContent   = db + "/10"
-  document.getElementById("m-5xx").textContent  = e5xx + "%"
-  document.getElementById("m-pipe").textContent = pipeOk + "%"
-
-  // Update chart — shift oldest point off, push new value
-  const pushPoint = (chart, dsIdx, val) => {
-    chart.data.datasets[dsIdx].data.shift()
-    chart.data.datasets[dsIdx].data.push(val)
-  }
-  pushPoint(cpuChart,  0, cpu);  pushPoint(cpuChart,  1, mem)
-  pushPoint(podsChart, 0, pods); pushPoint(podsChart, 1, e5xx)
-  cpuChart.update("none"); podsChart.update("none")
-
-  // Color metric tiles
-  document.querySelectorAll(".metric").forEach(m => {
-    m.classList.remove("crit","warn","ok")
-    const v = parseInt(m.querySelector(".val").textContent)
-    m.classList.add(v >= 80 ? "crit" : v >= 50 ? "warn" : "ok")
-  })
+const socket=io()
+socket.on("metrics:update",({cpu,mem,pods,db,e5xx,pipeOk})=>{
+  document.getElementById("m-cpu").textContent=cpu+"%";document.getElementById("m-mem").textContent=mem+"%"
+  document.getElementById("m-pods").textContent=pods;document.getElementById("m-db").textContent=db+"/10"
+  document.getElementById("m-5xx").textContent=e5xx+"%";document.getElementById("m-pipe").textContent=pipeOk+"%"
+  const push=(c,i,v)=>{c.data.datasets[i].data.shift();c.data.datasets[i].data.push(v)}
+  push(cpuChart,0,cpu);push(cpuChart,1,mem);push(podsChart,0,pods);push(podsChart,1,e5xx)
+  cpuChart.update("none");podsChart.update("none")
+  document.querySelectorAll(".metric").forEach(m=>{m.classList.remove("crit","warn","ok");const v=parseInt(m.querySelector(".val").textContent);m.classList.add(v>=80?"crit":v>=50?"warn":"ok")})
 })
-
-// Track which stages have had their runner header injected
-const headerDone = {}
-
-socket.on("pipeline:event", ({stage, status, message}) => {
-  setStage(stage, status)
-
-  // Inject runner boot header once per stage when it starts running
-  if (status === "running" && !headerDone[stage]) {
-    headerDone[stage] = true
-    const jobNames = {
-      init:         "fetch-issue",
-      duo_workflow: "trigger-duo-workflow",
-      polling:      "agent-pipeline",
-      done:         "create-mr",
-      failed:       "pipeline-failed",
-    }
-    injectRunnerHeader(stage, jobNames[stage] || stage)
-    appendSection(stage, "Running agent steps")
+const headerDone={}
+socket.on("pipeline:event",({stage,status,message})=>{
+  setStage(stage,status)
+  if(stage==="init"&&status==="done")document.getElementById("issueHint").textContent="Issue #"+document.getElementById("issueInput").value+" - "+message.replace("Issue: ","")
+  if(status==="running"&&!headerDone[stage]){
+    headerDone[stage]=true
+    injectRunnerHeader(stage,STAGES.find(s=>s.key===stage)?.job||stage)
+    appendSection(stage,"Running agent steps")
   }
-
-  appendLog(stage, message)
-
-  if (status === "done" || status === "error") {
-    document.getElementById("log-" + stage).querySelector(".cursor")?.remove()
-    appendSection(stage, status === "done" ? "Job succeeded" : "Job failed",
-      document.getElementById("dur-" + stage).textContent)
-    appendLog(stage, status === "done" ? "Job succeeded" : "Job failed — see errors above",
-      status === "done" ? "pass" : "err")
-    appendSection(stage, "Cleaning up project directory and file based variables", "00:01")
-  }
-
-  if (stage === "done" && status === "done") {
-    appendLog("done", "✅ All production fixes applied — metrics updating live...", "ok")
+  appendLog(stage,message)
+  if(status==="done"||status==="error"){
+    document.getElementById("log-"+stage).querySelector(".cursor")?.remove()
+    appendSection(stage,status==="done"?"Job succeeded":"Job failed",document.getElementById("dur-"+stage).textContent)
+    appendLog(stage,status==="done"?"Job succeeded":"Job failed - see errors above",status==="done"?"pass":"err")
+    appendSection(stage,"Cleaning up project directory and file based variables","00:01")
   }
 })
 
-// ── Init ─────────────────────────────────────────────────────────────────────
-buildPipeline()
-initCharts()
+async function refreshGreenStats(){try{const r=await fetch("/stats/green"),d=await r.json();document.getElementById("g-co2").textContent=d.total_co2e_g.toFixed(4)+"g";document.getElementById("g-haiku").textContent=d.haiku_pct+"%";document.getElementById("g-sonnet").textContent=(100-d.haiku_pct)+"%"}catch{}}
+setInterval(refreshGreenStats,5000)
+
+async function refreshTokenStats(){try{const r=await fetch("/stats/tokens"),{summary}=await r.json();document.getElementById("t-total").textContent=summary.total_tokens.toLocaleString();document.getElementById("t-in").textContent=summary.input_tokens.toLocaleString();document.getElementById("t-out").textContent=summary.output_tokens.toLocaleString();document.getElementById("t-cost").textContent="$"+summary.estimated_cost_usd.toFixed(5)}catch{}}
+setInterval(refreshTokenStats,3000)
+
+function addMsg(text,role){const box=document.getElementById("aiMessages"),div=document.createElement("div");div.className="ai-msg "+role;div.textContent=text;box.appendChild(div);box.scrollTop=box.scrollHeight;return div}
+async function sendChat(){
+  const input=document.getElementById("aiInput"),msg=input.value.trim();if(!msg)return
+  input.value="";addMsg(msg,"user")
+  const btn=document.getElementById("aiSendBtn");btn.disabled=true
+  const thinking=addMsg("Analyzing...","bot thinking")
+  const m=msg.match(/#(\d+)|issue\s+(\d+)/i),issueIid=m?parseInt(m[1]||m[2]):null
+  if(issueIid){_lastIid=issueIid;document.getElementById("issueInput").value=issueIid}
+  try{
+    const res=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg,issueIid})})
+    const{reply,error}=await res.json()
+    thinking.className="ai-msg bot";thinking.textContent=reply||error||"No response"
+    if(issueIid){document.getElementById("aiRunBtn").style.display="block";document.getElementById("issueHint").textContent="Issue #"+issueIid+" - analyzed by AI"}
+  }catch{thinking.className="ai-msg bot";thinking.textContent="Error reaching AI assistant."}
+  btn.disabled=false;refreshTokenStats()
+}
+
+buildPipeline();initCharts();refreshTokenStats();refreshGreenStats()
 </script>
 </body>
 </html>

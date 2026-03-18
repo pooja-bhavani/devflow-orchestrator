@@ -21,7 +21,7 @@ export class SecurityAgent {
   async run(files: GeneratedFile[]): Promise<SecurityReport> {
     console.log("🔒 SecurityAgent: scanning for vulnerabilities...")
     const codeBlock = files.map((f) => `// FILE: ${f.path}\n${f.content}`).join("\n\n")
-    const raw = await callClaude(SYSTEM, `Scan this code:\n\n${codeBlock}`)
+    const raw = await callClaude(SYSTEM, `Scan this code:\n\n${codeBlock}`, "security-agent")
     return JSON.parse(raw) as SecurityReport
   }
 }
