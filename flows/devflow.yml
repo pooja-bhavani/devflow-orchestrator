@@ -4,9 +4,6 @@ public: true
 definition:
   version: v1
   environment: ambient
-  triggers:
-    - type: mention
-    - type: assigned
 
   components:
     - name: "rca_agent"
