@@ -195,10 +195,12 @@ canvas{max-height:130px}
 <div class="glass" style="margin-top:0.5rem;padding:0.6rem 0.85rem;font-size:0.72rem;color:#8b949e;display:flex;gap:1rem;flex-wrap:wrap;align-items:center">
   <span style="color:#3fb950;font-weight:700">&#127807; Green Agent</span>
   <span>CO&#8322;e: <b id="g-co2" style="color:#3fb950">0.0000g</b></span>
-  <span>Haiku calls: <b id="g-haiku" style="color:#3fb950">0%</b></span>
-  <span>Sonnet calls: <b id="g-sonnet" style="color:#d29922">0%</b></span>
-  <span title="% of calls routed to low-energy Haiku model">&#9889; Energy saved by smart routing</span>
+  <span>Saved: <b id="g-saved" style="color:#3fb950">0.0000g</b></span>
+  <span>Haiku: <b id="g-haiku" style="color:#3fb950">0%</b></span>
+  <span>Sonnet: <b id="g-sonnet" style="color:#d29922">0%</b></span>
+  <span title="CO2e avoided by routing lightweight tasks to Haiku">&#9889; Smart routing active</span>
 </div>
+<div class="glass" id="g-insights" style="margin-top:0.35rem;padding:0.5rem 0.85rem;font-size:0.7rem;color:#8b949e;display:none;flex-direction:column;gap:0.25rem"></div>
 <div class="glass" style="margin-top:0.5rem;padding:0.6rem 0.85rem;font-size:0.72rem;color:#8b949e;display:flex;gap:1rem;flex-wrap:wrap">
   <span>Token Usage</span>
   <span>Total: <b id="t-total" style="color:#e6edf3">0</b></span>
@@ -228,10 +230,16 @@ canvas{max-height:130px}
 </div><!-- end layout -->
 <script>
 const STAGES=[
-  {key:"init",        label:"Fetch Issue",    job:"fetch-issue"},
-  {key:"duo_workflow",label:"RCA + Spec",     job:"rca-and-spec"},
-  {key:"polling",     label:"Agent Pipeline", job:"agent-pipeline"},
-  {key:"done",        label:"Complete",       job:"create-mr"},
+  {key:"fetch",      label:"Fetch Issue",        job:"fetch-issue"},
+  {key:"rca",        label:"Root Cause Analysis", job:"root-cause-agent"},
+  {key:"spec",       label:"Spec Agent",          job:"spec-agent"},
+  {key:"code",       label:"Code Agent",          job:"code-agent"},
+  {key:"security",   label:"Security Scan",       job:"security-agent"},
+  {key:"compliance", label:"Compliance Check",    job:"compliance-agent"},
+  {key:"tests",      label:"Test Generation",     job:"test-agent"},
+  {key:"review",     label:"Code Review",         job:"review-agent"},
+  {key:"deploy",     label:"Deploy Config",       job:"deploy-agent"},
+  {key:"done",       label:"Create MR",           job:"create-mr"},
 ]
 const stageLineNum={},stageIsOpen={},stageStartMs={}
 
@@ -385,7 +393,18 @@ socket.on("pipeline:event",({stage,status,message})=>{
   }
 })
 
-async function refreshGreenStats(){try{const r=await fetch("/stats/green"),d=await r.json();document.getElementById("g-co2").textContent=d.total_co2e_g.toFixed(4)+"g";document.getElementById("g-haiku").textContent=d.haiku_pct+"%";document.getElementById("g-sonnet").textContent=(100-d.haiku_pct)+"%"}catch{}}
+async function refreshGreenStats(){
+  try{
+    const[sr,rr]=await Promise.all([fetch("/stats/green"),fetch("/stats/green/report")])
+    const s=await sr.json(),r=await rr.json()
+    document.getElementById("g-co2").textContent=s.total_co2e_g.toFixed(4)+"g"
+    document.getElementById("g-saved").textContent=(s.energy_saved_g||0).toFixed(4)+"g"
+    document.getElementById("g-haiku").textContent=s.haiku_pct+"%"
+    document.getElementById("g-sonnet").textContent=(100-s.haiku_pct)+"%"
+    const box=document.getElementById("g-insights")
+    if(r.insights&&r.insights.length>0){box.style.display="flex";box.innerHTML=r.insights.map(i=>`<span>&#128161; ${i}</span>`).join("")}
+  }catch{}
+}
 setInterval(refreshGreenStats,5000)
 
 async function refreshTokenStats(){try{const r=await fetch("/stats/tokens"),{summary}=await r.json();document.getElementById("t-total").textContent=summary.total_tokens.toLocaleString();document.getElementById("t-in").textContent=summary.input_tokens.toLocaleString();document.getElementById("t-out").textContent=summary.output_tokens.toLocaleString();document.getElementById("t-cost").textContent="$"+summary.estimated_cost_usd.toFixed(5)}catch{}}
