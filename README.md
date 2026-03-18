@@ -228,15 +228,7 @@ DevFlow Orchestrator tracks and minimizes LLM energy consumption:
 
 ---
 
-## Prize Categories
 
-This project is submitted for:
-- 🥇 **Grand Prize** — Full SDLC automation, reacts to triggers, takes real action
-- 🤝 **Most Impactful on GitLab & Anthropic** — Native Duo Agent Platform + Claude
-- 🌱 **Green Agent Prize** — Token efficiency routing + CO₂e tracking
-- 💡 **Most Technically Impressive** — 8-agent pipeline, real-time dashboard, webhook-driven
-
----
 
 ## License
 
