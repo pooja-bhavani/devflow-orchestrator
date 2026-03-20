@@ -12,8 +12,6 @@ definition:
       inputs:
         - "context:goal"
       toolset:
-        - get_issue
-        - read_file
         - create_issue_note
       ui_log_events:
         - on_agent_final_answer
@@ -134,39 +132,42 @@ definition:
       name: "Root Cause Analysis Prompt"
       prompt_template:
         system: |
-          You are a senior SRE and DevSecOps expert.
+          You are a senior SRE and DevSecOps expert embedded in the DevFlow Orchestrator pipeline.
 
-          The issue IID and project are already known from the context. Do NOT ask for clarification.
+          STEP 1 — Call get_issue:
+            project_id: "gitlab-ai-hackathon/participants/23075558"
+            issue_iid: look for the number after "Issue IID:" in the user message
 
-          You MUST immediately call create_issue_note with:
-          - project_id: "gitlab-ai-hackathon/participants/23075558"
-          - issue_iid: the IID number from the context (e.g. if context says "Issue IID: 5", use 5)
-          - body: your root cause analysis in this exact format:
+          STEP 2 — From the get_issue response, note the "iid" field value.
+
+          STEP 3 — Call create_issue_note:
+            project_id: "gitlab-ai-hackathon/participants/23075558"
+            issue_iid: THE "iid" VALUE FROM THE get_issue RESPONSE (not 1, not a guess)
+            body: your RCA analysis using this format:
 
           ## 🔍 DevFlow Orchestrator — Root Cause Analysis
 
-          **Severity:** [P0/P1/P2/P3]
-          **Category:** [memory-leak | security | performance | config | data-corruption | compliance]
+          **Severity:** P0 | P1 | P2 | P3
+          **Category:** security | memory-leak | performance | config | data-corruption | compliance
 
           ### Root Causes
-          - [specific root cause 1]
-          - [specific root cause 2]
+          - <root cause 1 based on the issue content>
+          - <root cause 2>
 
           ### Affected Components
-          - [file or service]
+          - <component or file from the issue>
 
           ### Fix Strategy
-          1. [concrete step 1]
-          2. [concrete step 2]
-          3. [concrete step 3]
+          1. <fix step 1>
+          2. <fix step 2>
+          3. <fix step 3>
 
-          **Estimated Effort:** [2h | 1d | 3d]
+          **Estimated Effort:** 2h | 1d | 3d
 
           ---
           *🤖 DevFlow Orchestrator: RCA ✅ → Spec → Code → Security → Compliance → Tests → Review → Deploy*
 
-          Do NOT read files first. Do NOT call get_issue. Do NOT ask questions.
-          Just analyze the issue text from the context and immediately call create_issue_note.
+          IMPORTANT: The issue_iid for create_issue_note MUST come from the get_issue response "iid" field.
         user: |
           {{goal}}
         placeholder: history
@@ -299,5 +300,3 @@ definition:
       unit_primitives: []
       params:
         timeout: 180
-
-
