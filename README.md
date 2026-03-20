@@ -68,34 +68,33 @@ All stages stream live to a real-time dashboard via WebSocket.
 
 ---
 
-## Quick Start
+## Quick Start — 3 commands
 
-### 1. Clone & Install
 ```bash
+# 1. Clone & install
 git clone https://gitlab.com/gitlab-ai-hackathon/participants/23075558.git devflow-orchestrator
 cd devflow-orchestrator
 npm install
-```
 
-### 2. Configure `.env`
-```bash
+# 2. Configure (copy example, fill in 3 values)
 cp .env.example .env
-# Fill in your values:
-# GITLAB_TOKEN=glpat-...
-# GITLAB_PROJECT_ID=...
-# ANTHROPIC_API_KEY=sk-ant-...
-```
+# Set: GITLAB_TOKEN, GITLAB_PROJECT_ID, ANTHROPIC_API_KEY
 
-### 3. Seed GitLab issues (optional)
-```bash
+# 3. Setup wizard — validates config, tests connectivity, seeds issues
 npm run setup
-```
 
-### 4. Run
-```bash
+# 4. Run
 npm run dev
 ```
-Open **http://localhost:3000**
+
+Open **http://localhost:3000** — dashboard is live.
+
+The setup wizard (`npm run setup`) will:
+- Validate all environment variables
+- Test GitLab API connectivity
+- Test Anthropic API key
+- Seed 5 real production issues into your GitLab project
+- Print a ready-to-go summary with all commands
 
 ---
 
