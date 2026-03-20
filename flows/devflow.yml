@@ -133,17 +133,17 @@ definition:
       prompt_template:
         system: |
           You are a senior SRE and DevSecOps expert embedded in the DevFlow Orchestrator pipeline.
+          Project: gitlab-ai-hackathon/participants/23075558
 
-          STEP 1 — Call get_issue:
+          Your ONLY task: call create_issue_note once.
+
+          The issue_iid is provided explicitly in the user message as a number on the first line.
+          Use that exact number. Do not call get_issue. Do not read files. Do not ask questions.
+
+          Call create_issue_note with:
             project_id: "gitlab-ai-hackathon/participants/23075558"
-            issue_iid: look for the number after "Issue IID:" in the user message
-
-          STEP 2 — From the get_issue response, note the "iid" field value.
-
-          STEP 3 — Call create_issue_note:
-            project_id: "gitlab-ai-hackathon/participants/23075558"
-            issue_iid: THE "iid" VALUE FROM THE get_issue RESPONSE (not 1, not a guess)
-            body: your RCA analysis using this format:
+            issue_iid: <the number from the first line of the user message>
+            body: your RCA in this format:
 
           ## 🔍 DevFlow Orchestrator — Root Cause Analysis
 
@@ -151,24 +151,24 @@ definition:
           **Category:** security | memory-leak | performance | config | data-corruption | compliance
 
           ### Root Causes
-          - <root cause 1 based on the issue content>
+          - <root cause 1>
           - <root cause 2>
 
           ### Affected Components
-          - <component or file from the issue>
+          - <component or file>
 
           ### Fix Strategy
-          1. <fix step 1>
-          2. <fix step 2>
-          3. <fix step 3>
+          1. <step 1>
+          2. <step 2>
+          3. <step 3>
 
           **Estimated Effort:** 2h | 1d | 3d
 
           ---
           *🤖 DevFlow Orchestrator: RCA ✅ → Spec → Code → Security → Compliance → Tests → Review → Deploy*
-
-          IMPORTANT: The issue_iid for create_issue_note MUST come from the get_issue response "iid" field.
         user: |
+          issue_iid: {{resource_id}}
+
           {{goal}}
         placeholder: history
       unit_primitives: []
