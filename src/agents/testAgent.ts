@@ -16,10 +16,14 @@ export class TestAgent {
     const codeBlock = files.map((f) => `// FILE: ${f.path}\n${f.content}`).join("\n\n")
     const prompt = `Acceptance criteria:\n${spec.acceptance_criteria.join("\n")}\n\nCode:\n${codeBlock}`
     const raw = await callClaude(SYSTEM, prompt, "test-agent")
-    const testContent = raw.trim()
-    return files.map((f) => ({
-      path: f.path.replace(/\.ts$/, ".test.ts").replace("src/", "src/__tests__/"),
-      content: testContent,
-    }))
+    // Strip markdown fences if present
+    const testContent = raw.replace(/^```[\w]*\n?/gm, "").replace(/^```$/gm, "").trim()
+    return files.map((f) => {
+      const base = f.path.replace(/^src\//, "").replace(/\.ts$/, "")
+      return {
+        path: `src/__tests__/${base}.test.ts`,
+        content: testContent,
+      }
+    })
   }
 }

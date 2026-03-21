@@ -35,12 +35,15 @@ const PRICING: Record<string, { input: number; output: number }> = {
  * 🌱 Green Agent routing — selects the lowest-energy model capable of the task.
  * Haiku: ~0.8$/M input tokens (lightweight tasks, short context)
  * Sonnet: ~3.0$/M input tokens (complex reasoning, long context)
- * Routing threshold: escalate only when input > 2000 chars or agent is flagged complex.
+ * Routing threshold: escalate when input > 2000 chars OR agent requires deep reasoning.
  */
-function greenRoute(input: string): string {
-  return input.length < 2000
-    ? "claude-3-5-haiku-20241022"   // 🌱 low energy
-    : "claude-3-5-sonnet-20241022"  // ⚡ high capability
+const COMPLEX_AGENTS = new Set(["code-agent", "review-agent", "test-agent"])
+
+function greenRoute(input: string, agent = "unknown"): string {
+  if (COMPLEX_AGENTS.has(agent) || input.length >= 2000) {
+    return "claude-3-5-sonnet-20241022"  // ⚡ high capability
+  }
+  return "claude-3-5-haiku-20241022"     // 🌱 low energy
 }
 
 /** Estimated CO2e per 1M tokens (gCO2e) — approximate, based on datacenter PUE ~1.2 */
@@ -105,7 +108,7 @@ export async function callClaude(
   // 🌱 Green Agent: route to lowest-carbon model capable of the task.
   // Haiku uses ~4x fewer tokens per dollar than Sonnet — lower energy per inference.
   // Only escalate to Sonnet when input complexity justifies it.
-  const model = forceModel || greenRoute(user)
+  const model = forceModel || greenRoute(user, agent)
 
 
   const msg = await client.messages.create({

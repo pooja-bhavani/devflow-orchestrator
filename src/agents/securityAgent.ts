@@ -22,6 +22,12 @@ export class SecurityAgent {
     console.log("🔒 SecurityAgent: scanning for vulnerabilities...")
     const codeBlock = files.map((f) => `// FILE: ${f.path}\n${f.content}`).join("\n\n")
     const raw = await callClaude(SYSTEM, `Scan this code:\n\n${codeBlock}`, "security-agent")
-    return JSON.parse(raw) as SecurityReport
+    try {
+      return JSON.parse(raw) as SecurityReport
+    } catch {
+      const match = raw.match(/\{[\s\S]*\}/)
+      if (match) return JSON.parse(match[0]) as SecurityReport
+      throw new Error("SecurityAgent: failed to parse response")
+    }
   }
 }

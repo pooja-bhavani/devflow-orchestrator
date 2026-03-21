@@ -2,6 +2,9 @@ import { Server as SocketServer } from "socket.io"
 import {
   getIssue,
   commentOnIssue,
+  createBranch,
+  commitFiles,
+  createMR,
   triggerDuoWorkflow,
   pollWorkflow,
 } from "../gitlab/gitlabClient"
@@ -47,7 +50,6 @@ export class DevFlowOrchestrator {
   }
 
   async run(issueIid: number): Promise<{ workflowId: number | null; finalStatus: string }> {
-    // Stage 1: Fetch issue
     this.log("init", `Fetching issue #${issueIid} from GitLab...`)
     const issue = await getIssue(issueIid)
     this.emit({ stage: "init", status: "done", message: `Issue: ${issue.title}` })
@@ -58,7 +60,7 @@ export class DevFlowOrchestrator {
       `**Pipeline:** RCA → Spec → Code → Security → Compliance → Tests → Review → Deploy\n\n` +
       `_Running all 8 agents now. Each agent will post its results below._`)
 
-    // ── [1/7] RCA ─────────────────────────────────────────────────────────────
+    // ── [1/7] RCA
     this.log("duo_workflow", "🔍 Running root cause analysis...")
     const rcaAgent = new RootCauseAgent()
     const rca = await rcaAgent.run(issue.title, issue.description)
@@ -67,12 +69,12 @@ export class DevFlowOrchestrator {
     await commentOnIssue(issueIid,
       `## 🔍 [1/7] Root Cause Analysis\n\n` +
       `**Severity:** ${rca.severity} | **Category:** ${rca.category}\n\n` +
-      `### Root Causes\n${rca.root_causes.map(r => `- ${r}`).join("\n")}\n\n` +
-      `### Affected Components\n${rca.affected_components.map(c => `- \`${c}\``).join("\n")}\n\n` +
-      `### Fix Strategy\n${rca.fix_strategy.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\n` +
+      `### Root Causes\n${rca.root_causes.map((r: string) => `- ${r}`).join("\n")}\n\n` +
+      `### Affected Components\n${rca.affected_components.map((c: string) => `- \`${c}\``).join("\n")}\n\n` +
+      `### Fix Strategy\n${rca.fix_strategy.map((s: string, i: number) => `${i + 1}. ${s}`).join("\n")}\n\n` +
       `**Estimated Effort:** ${rca.estimated_effort}`)
 
-    // ── [2/7] Spec ────────────────────────────────────────────────────────────
+    // ── [2/7] Spec
     this.log("duo_workflow", "🧠 Generating implementation spec...")
     const specAgent = new SpecAgent()
     const spec = await specAgent.run(issue.title, issue.description)
@@ -81,11 +83,11 @@ export class DevFlowOrchestrator {
     await commentOnIssue(issueIid,
       `## 🧠 [2/7] Implementation Spec\n\n` +
       `**Summary:** ${spec.summary}\n\n` +
-      `### Tasks\n${spec.tasks.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n\n` +
-      `### Files to Modify\n${spec.files.map(f => `- \`${f}\``).join("\n")}\n\n` +
-      `### Acceptance Criteria\n${spec.acceptance_criteria.map(a => `- ${a}`).join("\n")}`)
+      `### Tasks\n${spec.tasks.map((t: string, i: number) => `${i + 1}. ${t}`).join("\n")}\n\n` +
+      `### Files to Modify\n${spec.files.map((f: string) => `- \`${f}\``).join("\n")}\n\n` +
+      `### Acceptance Criteria\n${spec.acceptance_criteria.map((a: string) => `- ${a}`).join("\n")}`)
 
-    // ── [3/7] Code ────────────────────────────────────────────────────────────
+    // ── [3/7] Code
     this.log("polling", "💻 Generating production-ready code fixes...")
     const codeAgent = new CodeAgent()
     const codeFiles = await codeAgent.run(spec)
@@ -94,11 +96,11 @@ export class DevFlowOrchestrator {
     await commentOnIssue(issueIid,
       `## 💻 [3/7] Code Generation\n\n` +
       `Generated **${codeFiles.length}** file(s):\n\n` +
-      codeFiles.map(f =>
+      codeFiles.map((f: { path: string; content: string }) =>
         `### \`${f.path}\`\n\`\`\`typescript\n${f.content.slice(0, 800)}${f.content.length > 800 ? "\n// ... (truncated)" : ""}\n\`\`\``
       ).join("\n\n"))
 
-    // ── [4/7] Security ────────────────────────────────────────────────────────
+    // ── [4/7] Security
     this.log("polling", "🔒 Scanning for OWASP Top 10 vulnerabilities...")
     const secAgent = new SecurityAgent()
     const security = await secAgent.run(codeFiles)
@@ -108,11 +110,11 @@ export class DevFlowOrchestrator {
       `## 🔒 [4/7] Security Scan\n\n` +
       `**Result:** ${security.passed ? "✅ PASSED" : "❌ FAILED"} | **Severity:** ${security.severity}\n\n` +
       (security.issues.length > 0
-        ? `### Issues Found\n${security.issues.map(i => `- **[${i.location}]** ${i.issue}\n  - Fix: ${i.fix}`).join("\n")}`
+        ? `### Issues Found\n${security.issues.map((i: { location: string; issue: string; fix: string }) => `- **[${i.location}]** ${i.issue}\n  - Fix: ${i.fix}`).join("\n")}`
         : `### ✅ No vulnerabilities found`) +
       `\n\n**Summary:** ${security.summary}`)
 
-    // ── [5/7] Compliance ──────────────────────────────────────────────────────
+    // ── [5/7] Compliance
     this.log("polling", "📋 Checking GDPR / SOC2 / OWASP ASVS / CIS / NIST...")
     const compAgent = new ComplianceAgent()
     const compliance = await compAgent.run(codeFiles, `${issue.title}\n${issue.description}`)
@@ -123,11 +125,11 @@ export class DevFlowOrchestrator {
       `**Score:** ${compliance.compliance_score}/100 | **Result:** ${compliance.passed ? "✅ PASSED" : "❌ FAILED"}\n\n` +
       `**Frameworks:** ${compliance.frameworks_checked.join(", ")}\n\n` +
       (compliance.violations.length > 0
-        ? `### Violations\n${compliance.violations.map(v => `- **[${v.framework} ${v.control}]** ${v.severity}: ${v.description}`).join("\n")}`
+        ? `### Violations\n${compliance.violations.map((v: { framework: string; control: string; severity: string; description: string }) => `- **[${v.framework} ${v.control}]** ${v.severity}: ${v.description}`).join("\n")}`
         : `### ✅ All compliance checks passed`) +
       `\n\n**Summary:** ${compliance.summary}`)
 
-    // ── [6/7] Tests ───────────────────────────────────────────────────────────
+    // ── [6/7] Tests
     this.log("polling", "🧪 Generating Jest test suite...")
     const testAgent = new TestAgent()
     const testFiles = await testAgent.run(codeFiles, spec)
@@ -136,11 +138,11 @@ export class DevFlowOrchestrator {
     await commentOnIssue(issueIid,
       `## 🧪 [6/7] Test Suite\n\n` +
       `Generated **${testFiles.length}** test file(s):\n\n` +
-      testFiles.map(f =>
+      testFiles.map((f: { path: string; content: string }) =>
         `### \`${f.path}\`\n\`\`\`typescript\n${f.content.slice(0, 600)}${f.content.length > 600 ? "\n// ... (truncated)" : ""}\n\`\`\``
       ).join("\n\n"))
 
-    // ── [7/7] Review + Deploy ─────────────────────────────────────────────────
+    // ── [7/7] Review + Deploy
     this.log("polling", "👁️  Final code review + MR preparation...")
     const reviewAgent = new ReviewAgent()
     const review = await reviewAgent.run(codeFiles, testFiles, security)
@@ -151,7 +153,27 @@ export class DevFlowOrchestrator {
     const deployPlan = await deployAgent.run(codeFiles, security, compliance, issue.title)
     this.log("polling", `✅ DeployAgent: ${deployPlan.files.length} deployment file(s)`)
 
-    // ── Trigger Duo workflow (best-effort) ────────────────────────────────────
+    // ── Auto-create branch, commit generated files, open MR
+    let mrUrl: string | null = null
+    try {
+      const branchName = `devflow/issue-${issueIid}-fix`
+      try {
+        await createBranch(branchName)
+        this.log("polling", `🌿 Creating branch ${branchName}...`)
+      } catch {
+        this.log("polling", `🌿 Branch ${branchName} already exists — reusing`)
+      }
+      const allFiles = [...codeFiles, ...testFiles, ...deployPlan.files]
+      await commitFiles(branchName, `fix: DevFlow auto-fix for issue #${issueIid}`, allFiles)
+      this.log("polling", `📦 Committing ${allFiles.length} generated file(s)...`)
+      mrUrl = await createMR(branchName, review.mr_title, review.mr_description)
+      this.log("polling", `🔀 MR created: ${mrUrl}`)
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      this.log("polling", `⚠️  MR creation failed: ${e.message}`)
+    }
+
+    // ── Trigger Duo workflow (best-effort)
     let workflowId: number | null = null
     try {
       const { id, status: initialStatus } = await triggerDuoWorkflow(rca.goal, issueIid)
@@ -175,12 +197,16 @@ export class DevFlowOrchestrator {
       }
     }
 
-    // ── Final summary ─────────────────────────────────────────────────────────
+    // ── Final summary
     const tokenStats = getTotalTokenStats()
     this.emit({ stage: "done", status: "done",
       message: `✅ Pipeline complete — ${tokenStats.total_tokens.toLocaleString()} tokens used` })
 
     _setMetricsRecovered?.()
+
+    const mrLine = mrUrl
+      ? `**MR:** [${review.mr_title}](${mrUrl})`
+      : `**MR:** ${review.mr_title}`
 
     await commentOnIssue(issueIid,
       `## ✅ DevFlow Orchestrator — Pipeline Complete\n\n` +
@@ -194,8 +220,8 @@ export class DevFlowOrchestrator {
       `| 🧪 Tests | ${testFiles.length} test file(s) |\n` +
       `| 👁️ Review | ${review.approved ? "✅ Approved" : "❌ Changes requested"} |\n` +
       `| 🚀 Deploy | ${deployPlan.files.length} deployment file(s) |\n\n` +
-      `**MR:** ${review.mr_title}\n\n` +
-      `💚 **Green Agent** — ${tokenStats.total_tokens.toLocaleString()} tokens | $${tokenStats.estimated_cost_usd.toFixed(4)} | ` +
+      mrLine + `\n\n` +
+      `💚 **Green Agent** — ${tokenStats.total_tokens.toLocaleString()} tokens | ${tokenStats.estimated_cost_usd.toFixed(4)} | ` +
       `Health check: \`${deployPlan.health_check_url}\``)
 
     return { workflowId, finalStatus }
