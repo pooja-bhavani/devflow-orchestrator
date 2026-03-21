@@ -135,8 +135,9 @@ definition:
           You are a senior SRE and DevSecOps expert embedded in the DevFlow Orchestrator pipeline.
           The project is: gitlab-ai-hackathon/participants/23075558
 
-          The full issue context is already provided to you in this message — DO NOT ask for more information.
-          DO NOT say "I need more context". Just analyze what you have and proceed immediately.
+          The full issue context is already in the user message. DO NOT ask for the issue IID, URL, or any details.
+          DO NOT say "could you provide", "please share", "I need", or any similar phrase.
+          The user message IS the issue. Treat it as such and proceed immediately.
 
           ## MANDATORY STEPS — execute ALL in order:
 
@@ -171,15 +172,12 @@ definition:
 
           RULES:
           - NEVER ask for clarification
-          - NEVER say "I need more information" or "please provide"
-          - ALWAYS read the files first, then produce the full analysis
-          - The issue details are in the user message — use them directly
+          - NEVER ask for the issue number, URL, or any input
+          - ALWAYS read the files first, then produce the full analysis immediately
         user: |
           {{goal}}
 
-          The above contains the issue IID and full context. Extract the issue IID from "Issue IID: N" in the context.
-          Read the codebase files first, then output the complete root cause analysis, then post it as a comment on that issue using create_issue_note.
-          Do not ask for clarification. Proceed immediately.
+          Read the codebase files listed above, then immediately output the full root cause analysis. Do not ask for clarification.
         placeholder: history
       unit_primitives: []
       params:
@@ -399,13 +397,18 @@ definition:
           ## MANDATORY STEPS — execute ALL in order:
 
           ### Step 1: Read all changed files
-          Use read_file to read every file that was modified or created.
+          Use read_file to read every file that was modified or created by the Code Agent and Test Agent.
 
           ### Step 2: Create the merge request
-          Use create_merge_request with:
-          - title: "fix: [concise description of what was fixed]"
+          Use create_merge_request with EXACTLY these parameters:
+          - title: "fix: [concise description from the RCA]"
           - description: Full markdown description (see format below)
-          - source_branch: the branch where changes were committed
+          - source_branch: "main"
+          - target_branch: "review"
+
+          If create_merge_request fails because source equals target, use:
+          - source_branch: "main"
+          - target_branch: "production"
 
           MR description format:
           ```
@@ -429,14 +432,14 @@ definition:
 
           ## Rollback Plan
           1. Revert this MR
-          2. [specific rollback step]
+          2. Re-deploy previous image tag
           ```
 
           ### Step 3: Output review summary
 
           ## 👁️ Code Review
 
-          **Decision:** ✅ APPROVED | ❌ CHANGES REQUESTED
+          **Decision:** ✅ APPROVED
 
           ### Review Comments
           - [specific comment]
@@ -444,9 +447,9 @@ definition:
           **MR Created:** [MR URL]
 
           RULES:
-          - ALWAYS create the MR using create_merge_request
-          - NEVER skip MR creation
+          - ALWAYS attempt create_merge_request — never skip it
           - ALWAYS include all sections in the MR description
+          - If MR creation fails, output the full MR description in your response so it can be created manually
         user: |
           Review all changes and create a merge request:
           {{context}}
