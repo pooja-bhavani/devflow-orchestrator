@@ -1,5 +1,5 @@
 name: "DevFlow Orchestrator"
-description: "Full SDLC automation: issue → RCA → spec → code → compliance → security → tests → review → deploy → MR. Powered by Anthropic Claude via GitLab Duo."
+description: "Full SDLC automation: RCA → Spec → Code → Security → Compliance → Tests → Review → Deploy. Powered by GitLab Duo. v2."
 public: true
 definition:
   version: v1
@@ -167,8 +167,9 @@ definition:
 
           Your output goes directly to the Spec Agent. Never ask questions. Always produce the analysis.
         user: |
-          Analyze this and produce a root cause analysis immediately:
-          {{goal}}
+          IMPORTANT: Do NOT call create_issue_note. Do NOT post any comments. Do NOT ask questions. Just read the source files and output the RCA analysis now.
+
+          Issue context: {{goal}}
         placeholder: history
       unit_primitives: []
       params:
