@@ -111,9 +111,9 @@ run-pipeline:
   image: node:20-alpine
   variables:
     ISSUE_IID: "5"
-    ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
-    GITLAB_TOKEN: $GITLAB_TOKEN
-    GITLAB_PROJECT_ID: $GITLAB_PROJECT_ID
+    ANTHROPIC_API_KEY: ""
+    GITLAB_TOKEN: "glpat-DuSYGfrebh1DqZYyy5Q5eW86MQp1OmRxbDdxCw.01.120j7wput"
+    GITLAB_PROJECT_ID: "79558990"
     GITLAB_API_URL: "https://gitlab.com/api/v4"
   script:
     - npm ci
@@ -145,9 +145,9 @@ run-pipeline-custom:
   stage: pipeline
   image: node:20-alpine
   variables:
-    ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
-    GITLAB_TOKEN: $GITLAB_TOKEN
-    GITLAB_PROJECT_ID: $GITLAB_PROJECT_ID
+    ANTHROPIC_API_KEY: ""
+    GITLAB_TOKEN: "glpat-DuSYGfrebh1DqZYyy5Q5eW86MQp1OmRxbDdxCw.01.120j7wput"
+    GITLAB_PROJECT_ID: "79558990"
     GITLAB_API_URL: "https://gitlab.com/api/v4"
   script:
     - npm ci
