@@ -22,24 +22,38 @@ function verifySignature(req: express.Request): boolean {
   return req.headers["x-gitlab-token"] === secret
 }
 
-/** GitLab webhook endpoint — triggered on issue creation */
+/** GitLab webhook endpoint — triggered on issue creation or note mention */
 app.post("/webhook", async (req, res) => {
   if (!verifySignature(req)) return res.status(401).json({ error: "Unauthorized" })
 
-  const { object_kind, object_attributes } = req.body
-  if (object_kind !== "issue" || object_attributes?.action !== "open") {
-    return res.status(200).json({ skipped: true })
+  const { object_kind, object_attributes, issue } = req.body
+
+  // Trigger on new issue
+  if (object_kind === "issue" && object_attributes?.action === "open") {
+    const issueIid: number = object_attributes.iid
+    res.status(202).json({ accepted: true, issueIid })
+    const orchestrator = new DevFlowOrchestrator(io)
+    orchestrator.run(issueIid).catch((err) => {
+      console.error("Pipeline failed:", err.message)
+    })
+    return
   }
 
-  const issueIid: number = object_attributes.iid
-  res.status(202).json({ accepted: true, issueIid })
+  // Trigger on note/comment mentioning the bot
+  if (object_kind === "note") {
+    const body: string = object_attributes?.note || ""
+    const issueIid: number = issue?.iid
+    if (issueIid && body.includes("@ai-devflow-orchestrator-gitlab-ai-hackathon")) {
+      res.status(202).json({ accepted: true, issueIid })
+      const orchestrator = new DevFlowOrchestrator(io)
+      orchestrator.run(issueIid).catch((err) => {
+        console.error("Pipeline failed:", err.message)
+      })
+      return
+    }
+  }
 
-  // Run pipeline async — don't block the webhook response
-  const orchestrator = new DevFlowOrchestrator(io)
-  orchestrator.run(issueIid).catch((err) => {
-    console.error("Pipeline failed:", err.message)
-    io.emit("pipeline:event", { stage: "failed", status: "error", message: err.message })
-  })
+  return res.status(200).json({ skipped: true })
 })
 
 /** Health check */
@@ -102,6 +116,15 @@ Keep responses concise and actionable. Use plain text, no markdown headers.`
     const e = err as { message?: string }
     res.status(500).json({ error: e.message ?? "Claude call failed" })
   }
+})
+
+/** Manual trigger endpoint for testing */
+app.post("/trigger/:issueIid", async (req, res) => {
+  const issueIid = parseInt(req.params.issueIid, 10)
+  if (isNaN(issueIid)) return res.status(400).json({ error: "Invalid issue IID" })
+  res.status(202).json({ accepted: true, issueIid })
+  const orchestrator = new DevFlowOrchestrator(io)
+  orchestrator.run(issueIid).catch((err) => console.error("Pipeline failed:", err.message))
 })
 
 /** Push live metrics to all connected dashboards every 5s */
