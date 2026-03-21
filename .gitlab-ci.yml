@@ -4,6 +4,7 @@ stages:
   - build
   - container-scan
   - test
+  - pipeline
   - deploy
 
 variables:
@@ -75,7 +76,9 @@ container-scanning:
     name: aquasec/trivy:latest
     entrypoint: [""]
   script:
+    # Generate full JSON report for artifacts
     - trivy image --exit-code 0 --severity HIGH,CRITICAL --format json --output trivy-report.json $DOCKER_IMAGE || true
+    # Block pipeline on CRITICAL CVEs — fix for CVE-2024-21626 + CVE-2023-44487
     - trivy image --exit-code 1 --severity CRITICAL $DOCKER_IMAGE
   artifacts:
     paths:
@@ -85,7 +88,7 @@ container-scanning:
   only:
     - main
     - /^devflow\/.*/
-  allow_failure: true
+  allow_failure: false
 
 # ── Test ──────────────────────────────────────────────────────────────────────
 typecheck:
@@ -101,6 +104,63 @@ lint:
   script:
     - npm ci
     - npx eslint src/ --ext .ts --max-warnings 0 || true
+
+# ── DevFlow Pipeline — Run all 8 agents against a GitLab issue ───────────────
+run-pipeline:
+  stage: pipeline
+  image: node:20-alpine
+  variables:
+    ISSUE_IID: "5"  # Change this to any issue number
+  script:
+    - npm ci
+    - npm run build
+    - |
+      echo "🚀 Starting DevFlow Orchestrator server..."
+      node dist/index.js &
+      SERVER_PID=$!
+      sleep 5
+
+      echo "🔍 Triggering full 8-agent pipeline on issue #${ISSUE_IID}..."
+      RESPONSE=$(wget -q -O- --post-data='{}' \
+        --header='Content-Type: application/json' \
+        http://localhost:3000/trigger/${ISSUE_IID} 2>&1)
+      echo "Trigger response: $RESPONSE"
+
+      echo "⏳ Waiting for pipeline to complete (all agents posting comments)..."
+      sleep 120
+
+      echo "✅ Pipeline run complete — check issue #${ISSUE_IID} for agent comments"
+      kill $SERVER_PID || true
+  environment:
+    name: pipeline-run
+  when: manual
+  allow_failure: false
+
+# ── DevFlow Pipeline — Run on specific issue via variable ─────────────────────
+run-pipeline-custom:
+  stage: pipeline
+  image: node:20-alpine
+  script:
+    - npm ci
+    - npm run build
+    - |
+      ISSUE=${PIPELINE_ISSUE_IID:-5}
+      echo "🚀 Starting DevFlow Orchestrator..."
+      node dist/index.js &
+      SERVER_PID=$!
+      sleep 5
+
+      echo "🔍 Running full pipeline on issue #${ISSUE}..."
+      wget -q -O- --post-data='{}' \
+        --header='Content-Type: application/json' \
+        http://localhost:3000/trigger/${ISSUE}
+
+      echo "⏳ Waiting 120s for all 8 agents to complete..."
+      sleep 120
+      kill $SERVER_PID || true
+      echo "✅ Done — check GitLab issue #${ISSUE} for all agent comments"
+  when: manual
+  allow_failure: false
 
 # ── Deploy ────────────────────────────────────────────────────────────────────
 deploy-staging:
