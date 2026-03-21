@@ -32,11 +32,21 @@ export async function commitFiles(
   message: string,
   files: { path: string; content: string }[]
 ): Promise<void> {
-  const actions = files.map((f) => ({
-    action: "create_or_update" as const,
-    file_path: f.path,
-    content: f.content,
-  }))
+  // Check which files already exist on the branch so we use the right action
+  const actions = await Promise.all(
+    files.map(async (f) => {
+      let action: "create" | "update" = "create"
+      try {
+        await api.get(
+          `/projects/${PROJECT}/repository/files/${encodeURIComponent(f.path)}?ref=${branch}`
+        )
+        action = "update"
+      } catch {
+        action = "create"
+      }
+      return { action, file_path: f.path, content: f.content }
+    })
+  )
   await api.post(`/projects/${PROJECT}/repository/commits`, {
     branch,
     commit_message: message,
