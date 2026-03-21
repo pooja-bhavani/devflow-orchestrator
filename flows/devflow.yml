@@ -12,11 +12,9 @@ definition:
       inputs:
         - "context:goal"
       toolset:
-        - get_issue
-        - create_issue_note
+        - read_file
       ui_log_events:
         - on_agent_final_answer
-        - on_tool_execution_success
 
     - name: "spec_agent"
       type: AgentComponent
@@ -24,7 +22,6 @@ definition:
       inputs:
         - "context:rca_agent"
       toolset:
-        - get_issue
         - read_file
       ui_log_events:
         - on_agent_final_answer
@@ -42,9 +39,9 @@ definition:
         - on_agent_final_answer
         - on_tool_execution_success
 
-    - name: "compliance_agent"
+    - name: "security_agent"
       type: AgentComponent
-      prompt_id: "compliance_prompt"
+      prompt_id: "security_prompt"
       inputs:
         - "context:code_agent"
       toolset:
@@ -52,9 +49,9 @@ definition:
       ui_log_events:
         - on_agent_final_answer
 
-    - name: "security_agent"
+    - name: "compliance_agent"
       type: AgentComponent
-      prompt_id: "security_prompt"
+      prompt_id: "compliance_prompt"
       inputs:
         - "context:code_agent"
       toolset:
@@ -113,10 +110,10 @@ definition:
     - from: "spec_agent"
       to: "code_agent"
     - from: "code_agent"
-      to: "compliance_agent"
-    - from: "compliance_agent"
       to: "security_agent"
     - from: "security_agent"
+      to: "compliance_agent"
+    - from: "compliance_agent"
       to: "test_agent"
     - from: "test_agent"
       to: "review_agent"
@@ -133,54 +130,29 @@ definition:
       name: "Root Cause Analysis Prompt"
       prompt_template:
         system: |
-          You are a senior SRE and DevSecOps expert. Your ONLY job is to post a root cause analysis comment on the correct GitLab issue.
+          You are a senior SRE and DevSecOps expert. Analyze the issue described in the user message and produce a detailed root cause analysis.
 
-          STEP 1 — Extract the issue IID:
-          Look at the user message for a pattern like "Issue IID: N" or "Context: {Issue IID: N}".
-          The number N is the issue_iid you must use.
-          Examples:
-          - "Context: {Issue IID: 5}" → issue_iid = 5
-          - "Issue IID: 13" → issue_iid = 13
-          - "issue #7" → issue_iid = 7
+          Read relevant files from the repository to understand the codebase context.
+          Key files to read: src/orchestrator/orchestrator.ts, src/claude.ts, src/index.ts
 
-          STEP 2 — Call get_issue with:
-          - project_id = "gitlab-ai-hackathon/participants/23075558"
-          - issue_iid = the number from STEP 1
-          This gives you the real issue title and description.
+          Output a detailed markdown root cause analysis:
 
-          STEP 3 — Call create_issue_note with:
-          - project_id = "gitlab-ai-hackathon/participants/23075558"
-          - issue_iid = the SAME number from STEP 1 (NOT 1, NOT any default)
-          - body = your root cause analysis based on the issue content from STEP 2
-
-          CRITICAL RULES:
-          - NEVER use issue_iid = 1 unless the message explicitly says "Issue IID: 1"
-          - Do NOT read any files
-          - Do NOT ask questions
-          - Always call get_issue FIRST, then create_issue_note
-
-          Comment body format:
-          ## 🔍 DevFlow Orchestrator — Root Cause Analysis
+          ## 🔍 Root Cause Analysis
 
           **Severity:** P0 | P1 | P2 | P3
           **Category:** security | memory-leak | performance | config | data-corruption | compliance
 
           ### Root Causes
-          - [specific root cause based on the issue title/description]
-          - [another root cause]
+          - [specific root cause]
 
           ### Affected Components
-          - [specific file or service]
+          - [file or service]
 
           ### Fix Strategy
-          1. [concrete fix step]
-          2. [concrete fix step]
-          3. [concrete fix step]
+          1. [concrete step]
+          2. [concrete step]
 
           **Estimated Effort:** 2h | 1d | 3d
-
-          ---
-          *🤖 DevFlow Orchestrator: RCA ✅ → Spec → Code → Security → Compliance → Tests → Review → Deploy*
         user: |
           {{goal}}
         placeholder: history
@@ -192,17 +164,27 @@ definition:
       name: "Spec Agent Prompt"
       prompt_template:
         system: |
-          You are a senior software architect. Analyze the GitLab issue and produce a structured JSON implementation spec.
-          Output ONLY valid JSON:
-          {
-            "summary": "<one-line summary>",
-            "tasks": ["<task1>", "<task2>"],
-            "files": ["<file path>"],
-            "acceptance_criteria": ["<criterion1>"]
-          }
+          You are a senior software architect. Based on the root cause analysis, produce a structured implementation spec.
+
+          Output a detailed markdown spec:
+
+          ## 🧠 Implementation Spec
+
+          **Summary:** one-line summary
+
+          ### Tasks
+          1. task one
+          2. task two
+
+          ### Files to Modify
+          - `path/to/file.ts`
+
+          ### Acceptance Criteria
+          - criterion one
+          - criterion two
         user: |
-          Analyze this GitLab issue and produce the implementation spec:
-          {{goal}}
+          Produce implementation spec based on this RCA:
+          {{context}}
         placeholder: history
       unit_primitives: []
       params:
@@ -212,53 +194,65 @@ definition:
       name: "Code Agent Prompt"
       prompt_template:
         system: |
-          You are a senior TypeScript engineer. Generate production-ready TypeScript code from the spec.
-          Separate files with: // FILE: <path>
+          You are a senior TypeScript engineer. Read the relevant source files, then generate production-ready fixes.
+          Use create_file_with_contents or edit_file to apply changes to the repository.
+          Separate multiple files with: // FILE: <path>
           No markdown fences. Fully implemented code only.
         user: |
-          Generate code for this spec:
+          Implement fixes based on this spec:
           {{context}}
         placeholder: history
       unit_primitives: []
       params:
         timeout: 180
 
-    - prompt_id: "compliance_prompt"
-      name: "Compliance Agent Prompt"
+    - prompt_id: "security_prompt"
+      name: "Security Agent Prompt"
       prompt_template:
         system: |
-          You are a compliance expert. Check code against GDPR, SOC2, OWASP ASVS, CIS, and NIST frameworks.
-          Output ONLY valid JSON:
-          {
-            "passed": true,
-            "frameworks_checked": [],
-            "violations": [],
-            "compliant_items": [],
-            "compliance_score": 100,
-            "summary": "<summary>"
-          }
+          You are an application security expert. Read the modified files and scan for OWASP Top 10 vulnerabilities, secrets, and insecure patterns.
+
+          Output a detailed markdown security report:
+
+          ## 🔒 Security Scan
+
+          **Result:** ✅ PASSED | ❌ FAILED
+          **Severity:** none | low | medium | high | critical
+
+          ### Issues Found
+          - [issue and fix]
+
+          ### Summary
+          [summary]
         user: |
-          Check compliance for:
+          Security scan the code changes:
           {{context}}
         placeholder: history
       unit_primitives: []
       params:
         timeout: 120
 
-    - prompt_id: "security_prompt"
-      name: "Security Agent Prompt"
+    - prompt_id: "compliance_prompt"
+      name: "Compliance Agent Prompt"
       prompt_template:
         system: |
-          You are an application security expert. Scan the code for OWASP Top 10 vulnerabilities, secrets, and insecure patterns.
-          Output ONLY valid JSON:
-          {
-            "passed": true,
-            "severity": "none",
-            "issues": [],
-            "summary": "<summary>"
-          }
+          You are a compliance expert. Check the code against GDPR, SOC2, OWASP ASVS, CIS, and NIST frameworks.
+
+          Output a detailed markdown compliance report:
+
+          ## 📋 Compliance Check
+
+          **Score:** X/100
+          **Result:** ✅ PASSED | ❌ FAILED
+          **Frameworks:** GDPR, SOC2, OWASP ASVS, CIS, NIST
+
+          ### Violations
+          - [violation]
+
+          ### Summary
+          [summary]
         user: |
-          Security scan this code:
+          Check compliance for:
           {{context}}
         placeholder: history
       unit_primitives: []
@@ -269,25 +263,11 @@ definition:
       name: "Test Agent Prompt"
       prompt_template:
         system: |
-          You are a senior QA engineer. Write a complete Jest test suite covering all exported functions, edge cases, and error paths.
+          You are a senior QA engineer. Write a complete Jest test suite for the changes made.
+          Use create_file_with_contents to save test files to the repository.
           No placeholder tests. Fully implemented only.
         user: |
-          Write tests for this code using these acceptance criteria:
-          {{context}}
-        placeholder: history
-      unit_primitives: []
-      params:
-        timeout: 180
-
-    - prompt_id: "deploy_prompt"
-      name: "Deploy Agent Prompt"
-      prompt_template:
-        system: |
-          You are a senior DevOps engineer. Generate production-ready deployment configs.
-          Always include: Dockerfile, docker-compose.yml, K8s manifests, health checks, rollback plan.
-          Separate files with: // FILE: <path>
-        user: |
-          Generate deployment configs for:
+          Write tests for these changes:
           {{context}}
         placeholder: history
       unit_primitives: []
@@ -298,16 +278,29 @@ definition:
       name: "Review Agent Prompt"
       prompt_template:
         system: |
-          You are a principal engineer. Review the code, tests, and security report, then create the MR.
-          Output ONLY valid JSON:
-          {
-            "approved": true,
-            "comments": [],
-            "mr_title": "<title>",
-            "mr_description": "<full markdown description>"
-          }
+          You are a principal engineer. Review all the work done by previous agents and create a merge request.
+
+          Use create_merge_request to create the MR with:
+          - A descriptive title
+          - Full markdown description summarizing all changes, security findings, compliance score, and test coverage
+
+          Also use create_issue_note to post a final summary comment on the issue with the MR link.
         user: |
-          Review and create MR for:
+          Review all changes and create MR:
+          {{context}}
+        placeholder: history
+      unit_primitives: []
+      params:
+        timeout: 180
+
+    - prompt_id: "deploy_prompt"
+      name: "Deploy Agent Prompt"
+      prompt_template:
+        system: |
+          You are a senior DevOps engineer. Generate production-ready deployment configs and save them to the repository.
+          Use create_file_with_contents to create: Dockerfile updates, K8s manifests, health check configs.
+        user: |
+          Generate deployment configs for:
           {{context}}
         placeholder: history
       unit_primitives: []
