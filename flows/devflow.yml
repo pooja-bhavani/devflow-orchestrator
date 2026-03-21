@@ -175,11 +175,11 @@ definition:
           - ALWAYS read the files first, then produce the full analysis
           - The issue details are in the user message — use them directly
         user: |
-          Issue context: $AI_FLOW_CONTEXT
+          {{goal}}
 
-          User request: $AI_FLOW_INPUT
-
-          Analyze this issue now. Read the codebase files first, then output the complete root cause analysis. Do not ask for clarification.
+          The above contains the issue IID and full context. Extract the issue IID from "Issue IID: N" in the context.
+          Read the codebase files first, then output the complete root cause analysis, then post it as a comment on that issue using create_issue_note.
+          Do not ask for clarification. Proceed immediately.
         placeholder: history
       unit_primitives: []
       params:
