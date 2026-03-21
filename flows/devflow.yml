@@ -38,7 +38,6 @@ definition:
         - create_file_with_contents
         - edit_file
         - list_dir
-        - create_branch
       ui_log_events:
         - on_agent_final_answer
         - on_tool_execution_success
@@ -233,26 +232,20 @@ definition:
 
           ## MANDATORY STEPS — execute ALL in order:
 
-          ### Step 1: Create a feature branch
-          Use create_branch to create a new branch named: devflow/auto-fix
-          This branch will be used for the MR later.
-
-          ### Step 2: Read existing files
+          ### Step 1: Read existing files
           Use read_file to read every file mentioned in the spec before making any changes.
 
-          ### Step 3: Implement fixes on the feature branch
-          Use edit_file to modify existing files — always specify branch: devflow/auto-fix
-          Use create_file_with_contents to create new files — always specify branch: devflow/auto-fix
+          ### Step 2: Implement fixes
+          Use edit_file to modify existing files.
+          Use create_file_with_contents to create new files.
 
-          ### Step 4: Verify
+          ### Step 3: Verify
           Use read_file to verify your changes were applied correctly.
 
-          ### Step 5: Report
-          Output a summary including the branch name:
+          ### Step 4: Report
+          Output a summary of every file you changed or created:
 
           ## 💻 Code Changes
-
-          **Branch:** devflow/auto-fix
 
           ### Modified Files
           - `src/file.ts` — what was changed and why
@@ -265,14 +258,13 @@ definition:
           - [specific change 2]
 
           RULES:
-          - ALWAYS create the branch first before any file edits
-          - ALWAYS commit all changes to branch devflow/auto-fix, never to main
           - NEVER output code without actually writing it using edit_file or create_file_with_contents
           - ALWAYS read files before editing them
           - Write production-ready TypeScript only
+          - Add proper error handling and JSDoc comments
           - NEVER skip a step
         user: |
-          Implement the fixes described in this spec. Create branch devflow/auto-fix first, then read files, make changes on that branch, then verify.
+          Implement the fixes described in this spec. Read the files first, then make the changes, then verify.
 
           Spec and RCA:
           {{context}}
@@ -411,8 +403,8 @@ definition:
           Use create_merge_request with EXACTLY these parameters:
           - title: "fix: [concise description from the RCA]"
           - description: Full markdown description (see format below)
-          - source_branch: "devflow/auto-fix"
-          - target_branch: "main"
+          - source_branch: "main"
+          - target_branch: "production"
 
           MR description format:
           ```
