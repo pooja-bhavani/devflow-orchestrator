@@ -1,16 +1,26 @@
 name: "DevFlow Orchestrator"
-description: "Full SDLC automation: Spec → Code → Security → Compliance → Tests → Review → Deploy. Powered by GitLab Duo."
+description: "Full SDLC automation: issue → RCA → spec → code → compliance → security → tests → review → deploy → MR. Powered by Anthropic Claude via GitLab Duo."
 public: true
 definition:
   version: v1
   environment: ambient
 
   components:
+    - name: "rca_agent"
+      type: AgentComponent
+      prompt_id: "rca_prompt"
+      inputs:
+        - "context:goal"
+      toolset:
+        - read_file
+      ui_log_events:
+        - on_agent_final_answer
+
     - name: "spec_agent"
       type: AgentComponent
       prompt_id: "spec_prompt"
       inputs:
-        - "context:goal"
+        - "context:rca_agent"
       toolset:
         - read_file
       ui_log_events:
@@ -94,6 +104,8 @@ definition:
         - on_tool_execution_success
 
   routers:
+    - from: "rca_agent"
+      to: "spec_agent"
     - from: "spec_agent"
       to: "code_agent"
     - from: "code_agent"
@@ -110,21 +122,30 @@ definition:
       to: "end"
 
   flow:
-    entry_point: "spec_agent"
+    entry_point: "rca_agent"
 
   prompts:
-    - prompt_id: "spec_prompt"
-      name: "Spec Agent Prompt"
+    - prompt_id: "rca_prompt"
+      name: "Root Cause Analysis Prompt"
       prompt_template:
         system: |
-          You are a senior SRE and software architect. Read the repository source files and produce a root cause analysis and implementation spec.
+          You are a senior SRE and DevSecOps expert embedded in the DevFlow Orchestrator pipeline.
 
-          Read these files first:
+          ABSOLUTE RULES — never break these:
+          - NEVER ask the user for clarification, issue IIDs, or any additional input
+          - NEVER say "could you provide", "please provide", "I need more information"
+          - NEVER try to post comments or notes to any issue
+          - NEVER call create_issue_note — you do not have that tool
+          - NEVER search for or read GitLab issues
+          - ALWAYS produce a complete root cause analysis immediately, no matter what input you receive
+          - If the input is vague, analyze the DevFlow Orchestrator codebase itself
+
+          Read these repository files to understand the codebase:
           - src/orchestrator/orchestrator.ts
           - src/claude.ts
           - src/index.ts
 
-          Output in this exact format:
+          Then immediately output a complete root cause analysis in this exact format:
 
           ## 🔍 Root Cause Analysis
 
@@ -137,7 +158,26 @@ definition:
           ### Affected Components
           - [file path or service name]
 
-          ---
+          ### Fix Strategy
+          1. [concrete actionable step]
+          2. [concrete actionable step]
+
+          **Estimated Effort:** 2h | 1d | 3d
+
+          Your output goes directly to the Spec Agent. Never ask questions. Always produce the analysis.
+        user: |
+          Analyze this and produce a root cause analysis immediately. Do NOT ask questions. Do NOT post comments:
+          {{goal}}
+        placeholder: history
+      unit_primitives: []
+      params:
+        timeout: 120
+
+    - prompt_id: "spec_prompt"
+      name: "Spec Agent Prompt"
+      prompt_template:
+        system: |
+          You are a senior software architect. Based on the root cause analysis, produce a structured implementation spec.
 
           ## 🧠 Implementation Spec
 
@@ -154,8 +194,8 @@ definition:
           - criterion one
           - criterion two
         user: |
-          Analyze and produce RCA + implementation spec for this issue:
-          {{goal}}
+          Produce implementation spec based on this RCA:
+          {{context}}
         placeholder: history
       unit_primitives: []
       params:
