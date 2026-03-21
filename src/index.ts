@@ -42,20 +42,6 @@ app.post("/webhook", async (req, res) => {
   })
 })
 
-/** Manual trigger endpoint for testing */
-app.post("/trigger/:issueIid", async (req, res) => {
-  const issueIid = parseInt(req.params.issueIid, 10)
-  if (isNaN(issueIid)) return res.status(400).json({ error: "Invalid issue IID" })
-
-  res.status(202).json({ accepted: true, issueIid })
-
-  const orchestrator = new DevFlowOrchestrator(io)
-  orchestrator.run(issueIid).catch((err) => {
-    console.error("Pipeline failed:", err.message)
-    io.emit("pipeline:event", { stage: "failed", status: "error", message: err.message })
-  })
-})
-
 /** Health check */
 app.get("/health", (_req, res) => res.json({ status: "ok" }))
 
