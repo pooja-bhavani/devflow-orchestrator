@@ -28,6 +28,12 @@ export class ReviewAgent {
     const codeBlock = codeFiles.map((f) => `// FILE: ${f.path}\n${f.content}`).join("\n\n")
     const prompt = `Security report:\n${JSON.stringify(security, null, 2)}\n\nCode:\n${codeBlock}`
     const raw = await callClaude(SYSTEM, prompt, "review-agent")
-    return JSON.parse(raw) as ReviewResult
+    try {
+      return JSON.parse(raw) as ReviewResult
+    } catch {
+      const match = raw.match(/\{[\s\S]*\}/)
+      if (match) return JSON.parse(match[0]) as ReviewResult
+      throw new Error("ReviewAgent: failed to parse response")
+    }
   }
 }

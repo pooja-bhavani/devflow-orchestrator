@@ -20,6 +20,12 @@ export class SpecAgent {
   async run(issueTitle: string, issueDescription: string): Promise<Spec> {
     console.log("🧠 SpecAgent: analyzing issue...")
     const raw = await callClaude(SYSTEM, `Issue: ${issueTitle}\n\n${issueDescription}`, "spec-agent")
-    return JSON.parse(raw) as Spec
+    try {
+      return JSON.parse(raw) as Spec
+    } catch {
+      const match = raw.match(/\{[\s\S]*\}/)
+      if (match) return JSON.parse(match[0]) as Spec
+      throw new Error("SpecAgent: failed to parse response")
+    }
   }
 }

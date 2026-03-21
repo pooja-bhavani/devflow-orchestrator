@@ -17,7 +17,9 @@ export class CodeAgent {
     console.log("💻 CodeAgent: generating code...")
     const prompt = `Spec:\n${JSON.stringify(spec, null, 2)}`
     const raw = await callClaude(SYSTEM, prompt, "code-agent")
-    return parseFiles(raw)
+    const files = parseFiles(raw)
+    if (files.length === 0) throw new Error("CodeAgent: no files generated")
+    return files
   }
 }
 

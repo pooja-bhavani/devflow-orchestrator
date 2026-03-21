@@ -33,7 +33,7 @@ export async function commitFiles(
   files: { path: string; content: string }[]
 ): Promise<void> {
   const actions = files.map((f) => ({
-    action: "create" as const,
+    action: "create_or_update" as const,
     file_path: f.path,
     content: f.content,
   }))
