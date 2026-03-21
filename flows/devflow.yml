@@ -1,28 +1,16 @@
 name: "DevFlow Orchestrator"
-description: "Full SDLC automation: RCA → Spec → Code → Security → Compliance → Tests → Review → Deploy. Powered by GitLab Duo. v2."
+description: "Full SDLC automation: Spec → Code → Security → Compliance → Tests → Review → Deploy. Powered by GitLab Duo."
 public: true
 definition:
   version: v1
   environment: ambient
 
   components:
-    - name: "rca_agent"
-      type: AgentComponent
-      prompt_id: "rca_prompt"
-      inputs:
-        - "context:goal"
-        - "context:issue_iid"
-      toolset:
-        - read_file
-        - get_issue
-      ui_log_events:
-        - on_agent_final_answer
-
     - name: "spec_agent"
       type: AgentComponent
       prompt_id: "spec_prompt"
       inputs:
-        - "context:rca_agent"
+        - "context:goal"
       toolset:
         - read_file
       ui_log_events:
@@ -86,7 +74,6 @@ definition:
       toolset:
         - read_file
         - create_merge_request
-        - create_issue_note
       ui_log_events:
         - on_agent_final_answer
         - on_tool_execution_success
@@ -107,8 +94,6 @@ definition:
         - on_tool_execution_success
 
   routers:
-    - from: "rca_agent"
-      to: "spec_agent"
     - from: "spec_agent"
       to: "code_agent"
     - from: "code_agent"
@@ -125,25 +110,21 @@ definition:
       to: "end"
 
   flow:
-    entry_point: "rca_agent"
+    entry_point: "spec_agent"
 
   prompts:
-    - prompt_id: "rca_prompt"
-      name: "Root Cause Analysis Prompt"
+    - prompt_id: "spec_prompt"
+      name: "Spec Agent Prompt"
       prompt_template:
         system: |
-          You are a senior SRE and DevSecOps expert embedded in the DevFlow Orchestrator pipeline.
+          You are a senior SRE and software architect. Read the repository source files and produce a root cause analysis and implementation spec.
 
-          ABSOLUTE RULES:
-          - NEVER ask the user for clarification or additional input
-          - NEVER say "could you provide" or "please provide"
-          - ALWAYS produce a complete root cause analysis immediately
+          Read these files first:
+          - src/orchestrator/orchestrator.ts
+          - src/claude.ts
+          - src/index.ts
 
-          You have access to the issue IID via context.issue_iid.
-          Use get_issue with project_id="gitlab-ai-hackathon/participants/23075558" and the issue_iid from context to fetch the issue details.
-          Then read src/orchestrator/orchestrator.ts, src/claude.ts, src/index.ts for codebase context.
-
-          Output immediately in this format:
+          Output in this exact format:
 
           ## 🔍 Root Cause Analysis
 
@@ -156,28 +137,7 @@ definition:
           ### Affected Components
           - [file path or service name]
 
-          ### Fix Strategy
-          1. [concrete actionable step]
-          2. [concrete actionable step]
-
-          **Estimated Effort:** 2h | 1d | 3d
-        user: |
-          Issue IID: {{context.issue_iid}}
-          Goal: {{goal}}
-
-          Fetch the issue using the IID above, read the source files, then output the root cause analysis immediately.
-        placeholder: history
-      unit_primitives: []
-      params:
-        timeout: 120
-
-    - prompt_id: "spec_prompt"
-      name: "Spec Agent Prompt"
-      prompt_template:
-        system: |
-          You are a senior software architect. Based on the root cause analysis, produce a structured implementation spec.
-
-          Output a detailed markdown spec:
+          ---
 
           ## 🧠 Implementation Spec
 
@@ -194,8 +154,8 @@ definition:
           - criterion one
           - criterion two
         user: |
-          Produce implementation spec based on this RCA:
-          {{context}}
+          Analyze and produce RCA + implementation spec for this issue:
+          {{goal}}
         placeholder: history
       unit_primitives: []
       params:
@@ -207,7 +167,6 @@ definition:
         system: |
           You are a senior TypeScript engineer. Read the relevant source files, then generate production-ready fixes.
           Use create_file_with_contents or edit_file to apply changes to the repository.
-          Separate multiple files with: // FILE: <path>
           No markdown fences. Fully implemented code only.
         user: |
           Implement fixes based on this spec:
@@ -221,9 +180,7 @@ definition:
       name: "Security Agent Prompt"
       prompt_template:
         system: |
-          You are an application security expert. Read the modified files and scan for OWASP Top 10 vulnerabilities, secrets, and insecure patterns.
-
-          Output a detailed markdown security report:
+          You are an application security expert. Read the modified files and scan for OWASP Top 10 vulnerabilities.
 
           ## 🔒 Security Scan
 
@@ -248,8 +205,6 @@ definition:
       prompt_template:
         system: |
           You are a compliance expert. Check the code against GDPR, SOC2, OWASP ASVS, CIS, and NIST frameworks.
-
-          Output a detailed markdown compliance report:
 
           ## 📋 Compliance Check
 
@@ -289,26 +244,13 @@ definition:
       name: "Review Agent Prompt"
       prompt_template:
         system: |
-          You are a principal engineer. Review all the work done by previous agents.
+          You are a principal engineer. Review all the work done by previous agents and create a merge request.
 
-          Step 1: Use create_merge_request to create an MR with:
+          Use create_merge_request to create an MR with:
           - A descriptive title summarizing the fix
           - Full markdown description with: changes made, security findings, compliance score, test coverage
-
-          Step 2: Use create_issue_note to post a final summary comment.
-          IMPORTANT for create_issue_note:
-          - Use project_path: "gitlab-ai-hackathon/participants/23075558"
-          - For the issue_iid: look at the context below — find any mention of "Issue IID:", "issue #", or "iid:" and use that number
-          - If no issue IID is found in context, use issue_iid: 5 as the default
-          - Post a comment summarizing: RCA findings, code changes, security result, compliance score, MR link
-
-          The comment should follow this format:
-          ## ✅ DevFlow Orchestrator — Pipeline Complete
-          **Pipeline:** RCA → Spec → Code → Security → Compliance → Tests → Review → Deploy
-          [summary of each agent's output]
-          **MR:** [link to created MR]
         user: |
-          Review all changes and create MR. Context from all agents:
+          Review all changes and create MR:
           {{context}}
         placeholder: history
       unit_primitives: []
