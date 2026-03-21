@@ -19,6 +19,7 @@ export async function getIssue(iid: number): Promise<GitLabIssue> {
 }
 
 export async function commentOnIssue(iid: number, body: string): Promise<void> {
+  console.log("Using Issue IID:", iid)
   await api.post(`/projects/${PROJECT}/issues/${iid}/notes`, { body })
 }
 
