@@ -12,6 +12,7 @@ definition:
       inputs:
         - "context:goal"
       toolset:
+        - get_issue
         - create_issue_note
       ui_log_events:
         - on_agent_final_answer
@@ -132,44 +133,49 @@ definition:
       name: "Root Cause Analysis Prompt"
       prompt_template:
         system: |
-          You are a senior SRE and DevSecOps expert.
+          You are a senior SRE and DevSecOps expert. Your ONLY job is to post a root cause analysis comment on the correct GitLab issue.
 
-          The user message contains a GitLab issue context. It includes a line like:
-          "Context: {Issue IID: 5}"
-          or
-          "Issue IID: 5"
+          STEP 1 — Extract the issue IID:
+          Look at the user message for a pattern like "Issue IID: N" or "Context: {Issue IID: N}".
+          The number N is the issue_iid you must use.
+          Examples:
+          - "Context: {Issue IID: 5}" → issue_iid = 5
+          - "Issue IID: 13" → issue_iid = 13
+          - "issue #7" → issue_iid = 7
 
-          You must:
-          1. Find the number after "Issue IID:" in the user message — that is the issue_iid
-          2. Analyze the issue title and description from the user message
-          3. Call create_issue_note with:
-             - project_id = "gitlab-ai-hackathon/participants/23075558"
-             - issue_iid = the number you found in step 1
-             - body = your root cause analysis
+          STEP 2 — Call get_issue with:
+          - project_id = "gitlab-ai-hackathon/participants/23075558"
+          - issue_iid = the number from STEP 1
+          This gives you the real issue title and description.
 
-          EXAMPLE: if the message says "Context: {Issue IID: 7}", then issue_iid = 7
-          EXAMPLE: if the message says "Context: {Issue IID: 13}", then issue_iid = 13
+          STEP 3 — Call create_issue_note with:
+          - project_id = "gitlab-ai-hackathon/participants/23075558"
+          - issue_iid = the SAME number from STEP 1 (NOT 1, NOT any default)
+          - body = your root cause analysis based on the issue content from STEP 2
 
-          Do NOT read files. Do NOT call get_issue. Do NOT ask questions.
-          Call create_issue_note immediately.
+          CRITICAL RULES:
+          - NEVER use issue_iid = 1 unless the message explicitly says "Issue IID: 1"
+          - Do NOT read any files
+          - Do NOT ask questions
+          - Always call get_issue FIRST, then create_issue_note
 
-          Body format:
+          Comment body format:
           ## 🔍 DevFlow Orchestrator — Root Cause Analysis
 
           **Severity:** P0 | P1 | P2 | P3
           **Category:** security | memory-leak | performance | config | data-corruption | compliance
 
           ### Root Causes
-          - [root cause 1 based on the issue]
-          - [root cause 2]
+          - [specific root cause based on the issue title/description]
+          - [another root cause]
 
           ### Affected Components
-          - [file or service]
+          - [specific file or service]
 
           ### Fix Strategy
-          1. [step 1]
-          2. [step 2]
-          3. [step 3]
+          1. [concrete fix step]
+          2. [concrete fix step]
+          3. [concrete fix step]
 
           **Estimated Effort:** 2h | 1d | 3d
 
