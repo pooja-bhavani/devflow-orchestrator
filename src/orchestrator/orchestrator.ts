@@ -30,12 +30,6 @@ export interface PipelineEvent {
   data?: unknown
 }
 
-interface AttemptStats {
-  attempt: number
-  failed: number
-  resolved: number
-}
-
 export class DevFlowOrchestrator {
   private io?: SocketServer
 
@@ -53,171 +47,157 @@ export class DevFlowOrchestrator {
   }
 
   async run(issueIid: number): Promise<{ workflowId: number | null; finalStatus: string }> {
-    const stats: AttemptStats = { attempt: 0, failed: 0, resolved: 0 }
+    // Stage 1: Fetch issue
+    this.log("init", `Fetching issue #${issueIid} from GitLab...`)
+    const issue = await getIssue(issueIid)
+    this.emit({ stage: "init", status: "done", message: `Issue: ${issue.title}` })
 
-    const runAttempt = async (): Promise<{ workflowId: number | null; finalStatus: string }> => {
-      stats.attempt++
+    await commentOnIssue(issueIid,
+      `## 🤖 DevFlow Orchestrator — Pipeline Started\n\n` +
+      `**Issue:** ${issue.title}\n\n` +
+      `**Pipeline:** RCA → Spec → Code → Security → Compliance → Tests → Review → Deploy\n\n` +
+      `_Running all 8 agents now. Each agent will post its results below._`)
 
-      // Stage 1: Fetch issue
-      this.log("init", `Attempt #${stats.attempt} — Fetching issue #${issueIid} from GitLab...`)
-      const issue = await getIssue(issueIid)
-      this.emit({ stage: "init", status: "done", message: `Issue: ${issue.title}` })
+    // ── [1/7] RCA ─────────────────────────────────────────────────────────────
+    this.log("duo_workflow", "🔍 Running root cause analysis...")
+    const rcaAgent = new RootCauseAgent()
+    const rca = await rcaAgent.run(issue.title, issue.description)
+    this.log("duo_workflow", `🔍 RCA complete — ${rca.severity} | ${rca.category}`)
 
-      await commentOnIssue(issueIid,
-        `🤖 **DevFlow Orchestrator** — Attempt #${stats.attempt} starting\n\nPipeline: RCA → Spec → Code → Security → Compliance → Tests → Review → Deploy → MR`)
+    await commentOnIssue(issueIid,
+      `## 🔍 [1/7] Root Cause Analysis\n\n` +
+      `**Severity:** ${rca.severity} | **Category:** ${rca.category}\n\n` +
+      `### Root Causes\n${rca.root_causes.map(r => `- ${r}`).join("\n")}\n\n` +
+      `### Affected Components\n${rca.affected_components.map(c => `- \`${c}\``).join("\n")}\n\n` +
+      `### Fix Strategy\n${rca.fix_strategy.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\n` +
+      `**Estimated Effort:** ${rca.estimated_effort}`)
 
-      // Stage 2: RCA
-      this.log("duo_workflow", "🔍 Running root cause analysis with Claude...")
-      const rcaAgent = new RootCauseAgent()
-      const rca = await rcaAgent.run(issue.title, issue.description)
+    // ── [2/7] Spec ────────────────────────────────────────────────────────────
+    this.log("duo_workflow", "🧠 Generating implementation spec...")
+    const specAgent = new SpecAgent()
+    const spec = await specAgent.run(issue.title, issue.description)
+    this.log("duo_workflow", `🧠 Spec ready — ${spec.tasks.length} tasks, ${spec.files.length} files`)
 
-      this.log("duo_workflow", `🔍 RCA complete — Severity: ${rca.severity} | Category: ${rca.category}`)
-      for (const rc of rca.root_causes) {
-        this.log("duo_workflow", `⚠️  Root cause: ${rc}`)
-      }
-      for (const comp of rca.affected_components) {
-        this.log("duo_workflow", `📁 Affected: ${comp}`)
-      }
-      for (const step of rca.fix_strategy) {
-        this.log("duo_workflow", `🔧 Fix step: ${step}`)
-      }
-      this.log("duo_workflow", `⚡ Estimated effort: ${rca.estimated_effort}`)
+    await commentOnIssue(issueIid,
+      `## 🧠 [2/7] Implementation Spec\n\n` +
+      `**Summary:** ${spec.summary}\n\n` +
+      `### Tasks\n${spec.tasks.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n\n` +
+      `### Files to Modify\n${spec.files.map(f => `- \`${f}\``).join("\n")}\n\n` +
+      `### Acceptance Criteria\n${spec.acceptance_criteria.map(a => `- ${a}`).join("\n")}`)
 
-      // Spec agent
-      this.log("duo_workflow", "🧠 SpecAgent: generating implementation spec...")
-      const specAgent = new SpecAgent()
-      const spec = await specAgent.run(issue.title, issue.description)
-      this.log("duo_workflow", `🧠 Spec ready — ${spec.tasks.length} task(s), ${spec.files.length} file(s)`)
-      for (const task of spec.tasks) {
-        this.log("duo_workflow", `  📋 ${task}`)
-      }
+    // ── [3/7] Code ────────────────────────────────────────────────────────────
+    this.log("polling", "💻 Generating production-ready code fixes...")
+    const codeAgent = new CodeAgent()
+    const codeFiles = await codeAgent.run(spec)
+    this.log("polling", `✅ CodeAgent: ${codeFiles.length} file(s) generated`)
 
-      // Trigger Duo workflow in background
-      let workflowId: number | null = null
-      this.log("duo_workflow", "🦾 Triggering GitLab Duo Agent workflow...")
-      try {
-        const { id, status: initialStatus } = await triggerDuoWorkflow(rca.goal, issueIid)
-        workflowId = id
-        this.emit({ stage: "duo_workflow", status: "done",
-          message: `🦾 Duo workflow #${id} started (${initialStatus})` })
-      } catch (err: unknown) {
-        const e = err as { message?: string }
-        this.emit({ stage: "duo_workflow", status: "done",
-          message: `⚠️  Duo workflow unavailable (${e.message}) — running local agent pipeline` })
-      }
+    await commentOnIssue(issueIid,
+      `## 💻 [3/7] Code Generation\n\n` +
+      `Generated **${codeFiles.length}** file(s):\n\n` +
+      codeFiles.map(f =>
+        `### \`${f.path}\`\n\`\`\`typescript\n${f.content.slice(0, 800)}${f.content.length > 800 ? "\n// ... (truncated)" : ""}\n\`\`\``
+      ).join("\n\n"))
 
-      // Stage 3: Local agent pipeline
-      this.log("polling", "⚙️  Starting local agent pipeline...")
+    // ── [4/7] Security ────────────────────────────────────────────────────────
+    this.log("polling", "🔒 Scanning for OWASP Top 10 vulnerabilities...")
+    const secAgent = new SecurityAgent()
+    const security = await secAgent.run(codeFiles)
+    this.log("polling", `🔒 Security: ${security.passed ? "✅ PASSED" : `❌ ${security.severity}`}`)
 
-      // Code agent
-      this.log("polling", "💻 CodeAgent: generating production-ready fixes...")
-      const codeAgent = new CodeAgent()
-      const codeFiles = await codeAgent.run(spec)
-      this.log("polling", `✅ CodeAgent: generated ${codeFiles.length} file(s)`)
-      for (const f of codeFiles) {
-        this.log("polling", `  ✏️  ${f.path} (${f.content.split("\n").length} lines)`)
-      }
+    await commentOnIssue(issueIid,
+      `## 🔒 [4/7] Security Scan\n\n` +
+      `**Result:** ${security.passed ? "✅ PASSED" : "❌ FAILED"} | **Severity:** ${security.severity}\n\n` +
+      (security.issues.length > 0
+        ? `### Issues Found\n${security.issues.map(i => `- **[${i.location}]** ${i.issue}\n  - Fix: ${i.fix}`).join("\n")}`
+        : `### ✅ No vulnerabilities found`) +
+      `\n\n**Summary:** ${security.summary}`)
 
-      // Security agent
-      this.log("polling", "🔒 SecurityAgent: scanning for OWASP Top 10 vulnerabilities...")
-      const secAgent = new SecurityAgent()
-      const security = await secAgent.run(codeFiles)
-      const secStatus = security.passed ? "✅ PASSED" : `❌ FAILED — ${security.severity} severity`
-      this.log("polling", `🔒 SecurityAgent: ${secStatus}`)
-      if (security.issues.length > 0) {
-        for (const iss of security.issues) {
-          this.log("polling", `  ⚠️  [${iss.location}] ${iss.issue}`)
-          this.log("polling", `     Fix: ${iss.fix}`)
-        }
-        stats.failed += security.issues.length
-      } else {
-        this.log("polling", "  ✅ No security vulnerabilities found")
-        stats.resolved++
-      }
+    // ── [5/7] Compliance ──────────────────────────────────────────────────────
+    this.log("polling", "📋 Checking GDPR / SOC2 / OWASP ASVS / CIS / NIST...")
+    const compAgent = new ComplianceAgent()
+    const compliance = await compAgent.run(codeFiles, `${issue.title}\n${issue.description}`)
+    this.log("polling", `📋 Compliance: ${compliance.compliance_score}/100`)
 
-      // Compliance agent
-      this.log("polling", "📋 ComplianceAgent: checking GDPR / SOC2 / OWASP ASVS / CIS / NIST...")
-      const compAgent = new ComplianceAgent()
-      const compliance = await compAgent.run(codeFiles, `${issue.title}\n${issue.description}`)
-      this.log("polling", `📋 ComplianceAgent: score ${compliance.compliance_score}/100 — ${compliance.passed ? "✅ PASSED" : "❌ FAILED"}`)
-      this.log("polling", `  Frameworks: ${compliance.frameworks_checked.join(", ")}`)
-      if (compliance.violations.length > 0) {
-        for (const v of compliance.violations) {
-          this.log("polling", `  ⚠️  [${v.framework} ${v.control}] ${v.severity}: ${v.description}`)
-          stats.failed++
-        }
-      } else {
-        this.log("polling", "  ✅ All compliance checks passed")
-        stats.resolved++
-      }
+    await commentOnIssue(issueIid,
+      `## 📋 [5/7] Compliance Check\n\n` +
+      `**Score:** ${compliance.compliance_score}/100 | **Result:** ${compliance.passed ? "✅ PASSED" : "❌ FAILED"}\n\n` +
+      `**Frameworks:** ${compliance.frameworks_checked.join(", ")}\n\n` +
+      (compliance.violations.length > 0
+        ? `### Violations\n${compliance.violations.map(v => `- **[${v.framework} ${v.control}]** ${v.severity}: ${v.description}`).join("\n")}`
+        : `### ✅ All compliance checks passed`) +
+      `\n\n**Summary:** ${compliance.summary}`)
 
-      // Test agent
-      this.log("polling", "🧪 TestAgent: generating Jest test suite...")
-      const testAgent = new TestAgent()
-      const testFiles = await testAgent.run(codeFiles, spec)
-      this.log("polling", `✅ TestAgent: generated ${testFiles.length} test file(s)`)
-      for (const t of testFiles) {
-        this.log("polling", `  🧪 ${t.path}`)
-      }
+    // ── [6/7] Tests ───────────────────────────────────────────────────────────
+    this.log("polling", "🧪 Generating Jest test suite...")
+    const testAgent = new TestAgent()
+    const testFiles = await testAgent.run(codeFiles, spec)
+    this.log("polling", `✅ TestAgent: ${testFiles.length} test file(s)`)
 
-      // Review agent
-      this.log("polling", "👁️  ReviewAgent: final code review + MR preparation...")
-      const reviewAgent = new ReviewAgent()
-      const review = await reviewAgent.run(codeFiles, testFiles, security)
-      this.log("polling", `👁️  ReviewAgent: ${review.approved ? "✅ APPROVED" : "❌ CHANGES REQUESTED"}`)
-      for (const comment of review.comments) {
-        this.log("polling", `  💬 ${comment}`)
-      }
-      this.log("polling", `  📝 MR title: ${review.mr_title}`)
+    await commentOnIssue(issueIid,
+      `## 🧪 [6/7] Test Suite\n\n` +
+      `Generated **${testFiles.length}** test file(s):\n\n` +
+      testFiles.map(f =>
+        `### \`${f.path}\`\n\`\`\`typescript\n${f.content.slice(0, 600)}${f.content.length > 600 ? "\n// ... (truncated)" : ""}\n\`\`\``
+      ).join("\n\n"))
 
-      // Deploy agent
-      this.log("polling", "🚀 DeployAgent: generating Dockerfile + K8s manifests + CI/CD config...")
-      const deployAgent = new DeployAgent()
-      const deployPlan = await deployAgent.run(codeFiles, security, compliance, issue.title)
-      this.log("polling", `✅ DeployAgent: generated ${deployPlan.files.length} deployment file(s)`)
-      for (const f of deployPlan.files) {
-        this.log("polling", `  🐳 ${f.path}`)
-      }
-      this.log("polling", `  �� Health check: ${deployPlan.health_check_url}`)
-      for (const step of deployPlan.rollback_steps) {
-        this.log("polling", `  🔄 Rollback: ${step}`)
-      }
+    // ── [7/7] Review + Deploy ─────────────────────────────────────────────────
+    this.log("polling", "👁️  Final code review + MR preparation...")
+    const reviewAgent = new ReviewAgent()
+    const review = await reviewAgent.run(codeFiles, testFiles, security)
+    this.log("polling", `👁️  Review: ${review.approved ? "✅ APPROVED" : "❌ CHANGES REQUESTED"}`)
 
-      // Poll Duo workflow if started
-      let finalStatus = "finished"
-      if (workflowId !== null) {
-        this.log("polling", `⚙️  Polling GitLab Duo workflow #${workflowId}...`)
-        try {
-          finalStatus = await pollWorkflow(workflowId, (_status, step) => {
-            if (/^❌/.test(step)) { stats.failed++; this.io?.emit("pipeline:stats", { ...stats }) }
-            if (/^✅/.test(step)) { stats.resolved++; this.io?.emit("pipeline:stats", { ...stats }) }
-            this.log("polling", step)
-          })
-        } catch (err: unknown) {
-          const e = err as { message?: string }
-          this.log("polling", `⚠️  Duo workflow polling ended: ${e.message}`)
-          finalStatus = "finished"
-        }
-      }
+    this.log("polling", "🚀 Generating deployment configs...")
+    const deployAgent = new DeployAgent()
+    const deployPlan = await deployAgent.run(codeFiles, security, compliance, issue.title)
+    this.log("polling", `✅ DeployAgent: ${deployPlan.files.length} deployment file(s)`)
 
-      // Stage 4: Done
-      const tokenStats = getTotalTokenStats()
-      this.emit({ stage: "done", status: "done",
-        message: `✅ Pipeline complete — ${stats.failed} issue(s) found, ${stats.resolved} resolved | ${tokenStats.total_tokens.toLocaleString()} tokens used` })
-
-      _setMetricsRecovered?.()
-
-      await commentOnIssue(issueIid,
-        `✅ **DevFlow Orchestrator** completed!\n\n` +
-        `**RCA:** ${rca.severity} ${rca.category} — ${rca.root_causes.join("; ")}\n\n` +
-        `**Security:** ${security.passed ? "✅ Passed" : `❌ ${security.severity} severity`} — ${security.issues.length} issue(s)\n\n` +
-        `**Compliance:** ${compliance.compliance_score}/100 — ${compliance.violations.length} violation(s)\n\n` +
-        `**MR:** ${review.mr_title}\n\n` +
-        `💚 **Green Agent** — Tokens: ${tokenStats.total_tokens.toLocaleString()} | Cost: $${tokenStats.estimated_cost_usd.toFixed(4)}`)
-
-      return { workflowId, finalStatus }
+    // ── Trigger Duo workflow (best-effort) ────────────────────────────────────
+    let workflowId: number | null = null
+    try {
+      const { id, status: initialStatus } = await triggerDuoWorkflow(rca.goal, issueIid)
+      workflowId = id
+      this.emit({ stage: "duo_workflow", status: "done",
+        message: `🦾 Duo workflow #${id} started (${initialStatus})` })
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      this.emit({ stage: "duo_workflow", status: "done",
+        message: `⚠️  Duo workflow unavailable (${e.message}) — local pipeline complete` })
     }
 
-    return runAttempt()
+    let finalStatus = "finished"
+    if (workflowId !== null) {
+      try {
+        finalStatus = await pollWorkflow(workflowId, (_status, step) => {
+          this.log("polling", step)
+        })
+      } catch {
+        finalStatus = "finished"
+      }
+    }
+
+    // ── Final summary ─────────────────────────────────────────────────────────
+    const tokenStats = getTotalTokenStats()
+    this.emit({ stage: "done", status: "done",
+      message: `✅ Pipeline complete — ${tokenStats.total_tokens.toLocaleString()} tokens used` })
+
+    _setMetricsRecovered?.()
+
+    await commentOnIssue(issueIid,
+      `## ✅ DevFlow Orchestrator — Pipeline Complete\n\n` +
+      `| Agent | Result |\n` +
+      `|-------|--------|\n` +
+      `| 🔍 Root Cause Analysis | ${rca.severity} — ${rca.category} |\n` +
+      `| 🧠 Spec | ${spec.tasks.length} tasks, ${spec.files.length} files |\n` +
+      `| 💻 Code | ${codeFiles.length} file(s) generated |\n` +
+      `| 🔒 Security | ${security.passed ? "✅ Passed" : `❌ ${security.severity}`} — ${security.issues.length} issue(s) |\n` +
+      `| 📋 Compliance | ${compliance.compliance_score}/100 — ${compliance.violations.length} violation(s) |\n` +
+      `| 🧪 Tests | ${testFiles.length} test file(s) |\n` +
+      `| 👁️ Review | ${review.approved ? "✅ Approved" : "❌ Changes requested"} |\n` +
+      `| 🚀 Deploy | ${deployPlan.files.length} deployment file(s) |\n\n` +
+      `**MR:** ${review.mr_title}\n\n` +
+      `💚 **Green Agent** — ${tokenStats.total_tokens.toLocaleString()} tokens | $${tokenStats.estimated_cost_usd.toFixed(4)} | ` +
+      `Health check: \`${deployPlan.health_check_url}\``)
+
+    return { workflowId, finalStatus }
   }
 }
