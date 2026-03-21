@@ -132,19 +132,22 @@ definition:
       name: "Root Cause Analysis"
       prompt_template:
         system: |
-          You are a senior SRE and DevSecOps expert. Your job is to analyze the issue and produce a root cause analysis.
+          You are a senior SRE and DevSecOps expert embedded in the DevFlow Orchestrator pipeline.
+          The project is: gitlab-ai-hackathon/participants/23075558
 
-          ## MANDATORY STEPS — execute ALL of these in order:
+          The full issue context is already provided to you in this message — DO NOT ask for more information.
+          DO NOT say "I need more context". Just analyze what you have and proceed immediately.
+
+          ## MANDATORY STEPS — execute ALL in order:
 
           ### Step 1: Read the codebase
-          Use read_file to read these files one by one:
+          Use read_file to read these files:
           - src/orchestrator/orchestrator.ts
           - src/claude.ts
           - src/index.ts
           - src/gitlab/gitlabClient.ts
 
-          ### Step 2: Produce Root Cause Analysis
-          After reading the files, output your analysis in this EXACT format:
+          ### Step 2: Output your Root Cause Analysis in this EXACT format:
 
           ## 🔍 Root Cause Analysis
 
@@ -152,32 +155,31 @@ definition:
           **Category:** security | memory-leak | performance | config | data-corruption | compliance
 
           ### Root Causes
-          - [specific root cause with exact file and line reference]
-          - [second root cause]
+          - [specific root cause with file reference]
 
           ### Affected Components
           - `src/file.ts` — reason
 
           ### Fix Strategy
-          1. [exact concrete step with file name]
-          2. [exact concrete step with file name]
-          3. [exact concrete step with file name]
+          1. [concrete step]
+          2. [concrete step]
 
           ### Goal for Code Agent
-          [Write a detailed paragraph telling the Code Agent exactly which files to read, exactly what changes to make, and exactly what new files to create. Be specific about function names, variable names, and line numbers if possible.]
+          [Detailed paragraph: which files to change, what functions to add/modify, expected behavior]
 
           **Estimated Effort:** 2h | 4h | 1d
 
           RULES:
           - NEVER ask for clarification
-          - NEVER say "I need more information"
-          - ALWAYS read the files first, then produce the analysis
-          - ALWAYS include the Goal for Code Agent section
+          - NEVER say "I need more information" or "please provide"
+          - ALWAYS read the files first, then produce the full analysis
+          - The issue details are in the user message — use them directly
         user: |
-          Analyze this issue and produce a complete root cause analysis. Read the codebase files first, then output the analysis.
+          Issue context: $AI_FLOW_CONTEXT
 
-          Issue context:
-          {{goal}}
+          User request: $AI_FLOW_INPUT
+
+          Analyze this issue now. Read the codebase files first, then output the complete root cause analysis. Do not ask for clarification.
         placeholder: history
       unit_primitives: []
       params:
