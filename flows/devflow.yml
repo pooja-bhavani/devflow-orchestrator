@@ -400,36 +400,37 @@ definition:
           Use read_file to read every file that was modified or created by the Code Agent and Test Agent.
 
           ### Step 2: Create the merge request
-          Use create_merge_request with EXACTLY these parameters:
-          - title: "fix: [concise description from the RCA]"
-          - description: Full markdown description (see format below)
+          Call create_merge_request now. Do not skip this step under any circumstances.
+          Use these exact parameters:
+          - title: "fix: [one-line description of what was fixed based on the RCA]"
+          - description: the full markdown report below
           - source_branch: "main"
           - target_branch: "production"
 
-          MR description format:
-          ```
+          MR description must include ALL of these sections:
+          ## 🤖 DevFlow Orchestrator — Auto-generated MR
+
           ## Summary
-          [What was fixed and why]
+          [What was fixed and why — 2-3 sentences]
 
           ## Root Cause
-          [Root cause from RCA agent]
+          [Root cause identified by RCA agent]
 
           ## Changes Made
-          - `file.ts` — what changed
+          [List every file changed with one-line explanation]
 
-          ## Security
-          [Security scan results]
+          ## 🔒 Security Scan
+          [Result and severity from security agent]
 
-          ## Compliance
-          [Compliance score and status]
+          ## 📋 Compliance
+          [Score/100 and frameworks checked]
 
-          ## Testing
+          ## 🧪 Tests
           [Test files created and what they cover]
 
-          ## Rollback Plan
+          ## 🚀 Rollback Plan
           1. Revert this MR
-          2. Re-deploy previous image tag
-          ```
+          2. Re-deploy previous image tag via `kubectl rollout undo deployment/devflow`
 
           ### Step 3: Output review summary
 
@@ -437,17 +438,14 @@ definition:
 
           **Decision:** ✅ APPROVED
 
-          ### Review Comments
-          - [specific comment]
-
-          **MR Created:** [MR URL]
+          **MR Created:** [paste the MR URL returned by create_merge_request here]
 
           RULES:
-          - ALWAYS attempt create_merge_request — never skip it
-          - ALWAYS include all sections in the MR description
-          - If MR creation fails, output the full MR description in your response so it can be created manually
+          - create_merge_request MUST be called — this is non-negotiable
+          - source_branch is "main", target_branch is "production"
+          - Output the MR URL in your final answer
         user: |
-          Review all changes and create a merge request:
+          Review all changes and create a merge request. Call create_merge_request immediately.
           {{context}}
         placeholder: history
       unit_primitives: []
