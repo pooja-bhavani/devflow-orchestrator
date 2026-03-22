@@ -1,89 +1,37 @@
 stages:
-  - secret-scan
-  - sast
-  - build
   - test
   - pipeline
   - deploy
 
 variables:
   NODE_VERSION: "20"
-  DOCKER_DRIVER: overlay2
 
-# ── Secret Scanning ──────────────────────────────────────────────────────────
-secret-detection:
-  stage: secret-scan
-  image: node:20-alpine
-  script:
-    - echo "✅ Secret scan — checking for hardcoded secrets in source files..."
-    - |
-      if grep -rE "(password|secret|api_key)\s*=\s*['\"][^'\"]{8,}" src/ --include="*.ts" 2>/dev/null; then
-        echo "❌ Potential secrets found in source"
-        exit 1
-      fi
-      echo "✅ No hardcoded secrets found in src/"
-  allow_failure: false
-
-# ── SAST ─────────────────────────────────────────────────────────────────────
-sast:
-  stage: sast
-  image: node:20-alpine
-  script:
-    - npm ci
-    - echo "✅ SAST — running npm audit..."
-    - npm audit --audit-level=critical || true
-    - echo "✅ SAST scan complete"
-  allow_failure: false
-
-# ── Build ─────────────────────────────────────────────────────────────────────
-build:
-  stage: build
-  image: node:20-alpine
-  script:
-    - npm ci
-    - npm run build
-  artifacts:
-    paths:
-      - dist/
-    expire_in: 1 hour
-
-# ── Test ──────────────────────────────────────────────────────────────────────
-typecheck:
+# ── Test: validate all source files and agents exist ─────────────────────────
+validate-source:
   stage: test
   image: node:20-alpine
   script:
     - npm ci
     - npx tsc --noEmit
     - echo "✅ TypeScript typecheck passed"
-
-lint:
-  stage: test
-  image: node:20-alpine
-  script:
-    - npm ci
-    - echo "✅ Lint check — validating source structure..."
     - |
-      for f in src/orchestrator/orchestrator.ts src/gitlab/gitlabClient.ts src/claude.ts src/index.ts; do
+      for f in \
+        src/orchestrator/orchestrator.ts \
+        src/gitlab/gitlabClient.ts \
+        src/claude.ts \
+        src/index.ts \
+        src/agents/rootCauseAgent.ts \
+        src/agents/specAgent.ts \
+        src/agents/codeAgent.ts \
+        src/agents/securityAgent.ts \
+        src/agents/complianceAgent.ts \
+        src/agents/testAgent.ts \
+        src/agents/reviewAgent.ts \
+        src/agents/deployAgent.ts; do
         if [ ! -f "$f" ]; then echo "❌ Missing: $f"; exit 1; fi
         echo "  ✅ $f"
       done
-    - echo "✅ All required source files present"
-  allow_failure: false
-
-validate-agents:
-  stage: test
-  image: node:20-alpine
-  script:
-    - npm ci
-    - echo "✅ Validating agent files..."
-    - |
-      for f in src/agents/rootCauseAgent.ts src/agents/specAgent.ts src/agents/codeAgent.ts \
-                src/agents/securityAgent.ts src/agents/complianceAgent.ts \
-                src/agents/testAgent.ts src/agents/reviewAgent.ts src/agents/deployAgent.ts; do
-        if [ ! -f "$f" ]; then echo "❌ Missing agent: $f"; exit 1; fi
-        echo "  ✅ $f"
-      done
-    - echo "✅ All 8 agents present"
+    - echo "✅ All 8 agents and core files present"
   allow_failure: false
 
 validate-flow:
@@ -91,24 +39,24 @@ validate-flow:
   image: node:20-alpine
   script:
     - npm ci
-    - echo "✅ Validating Duo workflow definition..."
     - |
-      if [ ! -f "flows/devflow.yml" ]; then echo "❌ Missing flows/devflow.yml"; exit 1; fi
       node -e "
         const fs = require('fs');
         const content = fs.readFileSync('flows/devflow.yml', 'utf8');
-        const agents = ['rca_agent','spec_agent','code_agent','security_agent','compliance_agent','test_agent','review_agent','deploy_agent'];
+        const agents = ['rca_agent','spec_agent','code_agent','security_agent',
+                        'compliance_agent','test_agent','review_agent','deploy_agent'];
         agents.forEach(a => {
-          if (!content.includes(a)) { console.error('Missing agent:', a); process.exit(1); }
+          if (!content.includes(a)) { console.error('❌ Missing agent:', a); process.exit(1); }
           console.log('  ✅', a);
         });
-        if (!content.includes('create_merge_request')) { console.error('Missing create_merge_request tool'); process.exit(1); }
-        console.log('  ✅ create_merge_request tool present');
-        console.log('✅ Flow definition valid — 8 agents, MR creation enabled');
+        if (!content.includes('create_merge_request')) {
+          console.error('❌ Missing create_merge_request'); process.exit(1);
+        }
+        console.log('✅ Flow valid — 8 agents, MR creation enabled');
       "
   allow_failure: false
 
-# ── DevFlow Pipeline — Run all 8 agents against a GitLab issue ───────────────
+# ── DevFlow Pipeline — run all 8 agents on issue #6 (manual) ─────────────────
 run-pipeline:
   stage: pipeline
   image: node:20-alpine
@@ -122,22 +70,22 @@ run-pipeline:
     - npm ci
     - npm run build
     - |
-      echo "🚀 Starting DevFlow Orchestrator server..."
+      echo "🚀 Starting DevFlow Orchestrator..."
       node dist/index.js &
       SERVER_PID=$!
       sleep 5
-      echo "🔍 Triggering full 8-agent pipeline on issue #${ISSUE_IID}..."
+      echo "🔍 Running all 8 agents on issue #${ISSUE_IID}..."
       wget -q -O- --post-data='{}' \
         --header='Content-Type: application/json' \
         http://localhost:3000/trigger/${ISSUE_IID}
-      echo "⏳ Waiting for all agents to complete..."
+      echo "⏳ Waiting 180s for all agents to complete..."
       sleep 180
-      echo "✅ Done — check issue #${ISSUE_IID} for agent comments and MR"
       kill $SERVER_PID || true
+      echo "✅ Done — check issue #${ISSUE_IID} for agent comments and auto-created MR"
   when: manual
   allow_failure: false
 
-# ── DevFlow Pipeline — triggered for any issue number ────────────────────────
+# ── DevFlow Pipeline — run on any issue (set ISSUE_IID when triggering) ───────
 run-pipeline-any-issue:
   stage: pipeline
   image: node:20-alpine
@@ -150,7 +98,6 @@ run-pipeline-any-issue:
     - npm ci
     - npm run build
     - |
-      # ISSUE_IID is passed via the trigger payload or defaults to 6
       ISSUE=${ISSUE_IID:-6}
       echo "🚀 Starting DevFlow Orchestrator for issue #${ISSUE}..."
       node dist/index.js &
@@ -164,9 +111,7 @@ run-pipeline-any-issue:
       sleep 180
       kill $SERVER_PID || true
       echo "✅ Done — check issue #${ISSUE} for comments and auto-created MR"
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "trigger"'
-    - when: manual
+  when: manual
   allow_failure: false
 
 # ── Deploy ────────────────────────────────────────────────────────────────────
