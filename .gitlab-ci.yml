@@ -55,7 +55,7 @@ run-pipeline:
   image: node:20-alpine
   variables:
     ISSUE_IID: "6"
-    ANTHROPIC_API_KEY: ""
+    ANTHROPIC_API_KEY: "REMOVED_SECRET"
     GITLAB_TOKEN: "glpat-DuSYGfrebh1DqZYyy5Q5eW86MQp1OmRxbDdxCw.01.120j7wput"
     GITLAB_PROJECT_ID: "79558990"
     GITLAB_API_URL: "https://gitlab.com/api/v4"
@@ -71,7 +71,7 @@ run-pipeline-any-issue:
   stage: pipeline
   image: node:20-alpine
   variables:
-    ANTHROPIC_API_KEY: ""
+    ANTHROPIC_API_KEY: "REMOVED_SECRET"
     GITLAB_TOKEN: "glpat-DuSYGfrebh1DqZYyy5Q5eW86MQp1OmRxbDdxCw.01.120j7wput"
     GITLAB_PROJECT_ID: "79558990"
     GITLAB_API_URL: "https://gitlab.com/api/v4"
