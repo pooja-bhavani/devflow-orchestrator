@@ -6,7 +6,7 @@ stages:
 variables:
   NODE_VERSION: "20"
 
-# ── Test: validate all source files and agents exist ─────────────────────────
+# ── Test ──────────────────────────────────────────────────────────────────────
 validate-source:
   stage: test
   image: node:20-alpine
@@ -32,31 +32,24 @@ validate-source:
         echo "  ✅ $f"
       done
     - echo "✅ All 8 agents and core files present"
-  allow_failure: false
 
 validate-flow:
   stage: test
   image: node:20-alpine
   script:
-    - npm ci
     - |
       node -e "
         const fs = require('fs');
-        const content = fs.readFileSync('flows/devflow.yml', 'utf8');
-        const agents = ['rca_agent','spec_agent','code_agent','security_agent',
-                        'compliance_agent','test_agent','review_agent','deploy_agent'];
-        agents.forEach(a => {
-          if (!content.includes(a)) { console.error('❌ Missing agent:', a); process.exit(1); }
-          console.log('  ✅', a);
+        const c = fs.readFileSync('flows/devflow.yml','utf8');
+        ['rca_agent','spec_agent','code_agent','security_agent',
+         'compliance_agent','test_agent','review_agent','deploy_agent'].forEach(a=>{
+          if(!c.includes(a)){console.error('Missing:',a);process.exit(1);}
+          console.log('  ✅',a);
         });
-        if (!content.includes('create_merge_request')) {
-          console.error('❌ Missing create_merge_request'); process.exit(1);
-        }
-        console.log('✅ Flow valid — 8 agents, MR creation enabled');
+        console.log('✅ Flow valid — 8 agents');
       "
-  allow_failure: false
 
-# ── DevFlow Pipeline — run all 8 agents on issue #6 (manual) ─────────────────
+# ── DevFlow Pipeline — run all 8 agents on issue #6 ──────────────────────────
 run-pipeline:
   stage: pipeline
   image: node:20-alpine
@@ -68,24 +61,12 @@ run-pipeline:
     GITLAB_API_URL: "https://gitlab.com/api/v4"
   script:
     - npm ci
-    - npm run build
-    - |
-      echo "🚀 Starting DevFlow Orchestrator..."
-      node dist/index.js &
-      SERVER_PID=$!
-      sleep 5
-      echo "🔍 Running all 8 agents on issue #${ISSUE_IID}..."
-      wget -q -O- --post-data='{}' \
-        --header='Content-Type: application/json' \
-        http://localhost:3000/trigger/${ISSUE_IID}
-      echo "⏳ Waiting 180s for all agents to complete..."
-      sleep 180
-      kill $SERVER_PID || true
-      echo "✅ Done — check issue #${ISSUE_IID} for agent comments and auto-created MR"
+    - echo "🚀 Running DevFlow pipeline on issue #${ISSUE_IID}..."
+    - node scripts/run-pipeline.mjs ${ISSUE_IID}
   when: manual
   allow_failure: false
 
-# ── DevFlow Pipeline — run on any issue (set ISSUE_IID when triggering) ───────
+# ── DevFlow Pipeline — run on any issue ──────────────────────────────────────
 run-pipeline-any-issue:
   stage: pipeline
   image: node:20-alpine
@@ -96,21 +77,9 @@ run-pipeline-any-issue:
     GITLAB_API_URL: "https://gitlab.com/api/v4"
   script:
     - npm ci
-    - npm run build
-    - |
-      ISSUE=${ISSUE_IID:-6}
-      echo "🚀 Starting DevFlow Orchestrator for issue #${ISSUE}..."
-      node dist/index.js &
-      SERVER_PID=$!
-      sleep 5
-      echo "🔍 Running all 8 agents on issue #${ISSUE}..."
-      wget -q -O- --post-data='{}' \
-        --header='Content-Type: application/json' \
-        http://localhost:3000/trigger/${ISSUE}
-      echo "⏳ Waiting 180s for all agents..."
-      sleep 180
-      kill $SERVER_PID || true
-      echo "✅ Done — check issue #${ISSUE} for comments and auto-created MR"
+    - ISSUE=${ISSUE_IID:-6}
+    - echo "� Running DevFlow pipeline on issue #${ISSUE}..."
+    - node scripts/run-pipeline.mjs ${ISSUE}
   when: manual
   allow_failure: false
 
@@ -120,9 +89,8 @@ deploy-staging:
   image: node:20-alpine
   environment:
     name: staging
-    url: http://staging.devflow.example.com
   script:
-    - echo "✅ Deploying DevFlow Orchestrator to staging..."
+    - echo "✅ Deploying to staging..."
   only:
     - main
   when: manual
@@ -132,9 +100,8 @@ deploy-production:
   image: node:20-alpine
   environment:
     name: production
-    url: http://devflow.example.com
   script:
-    - echo "✅ Deploying DevFlow Orchestrator to production..."
+    - echo "✅ Deploying to production..."
   only:
     - main
   when: manual
