@@ -113,7 +113,7 @@ run-pipeline:
   stage: pipeline
   image: node:20-alpine
   variables:
-    ISSUE_IID: "5"
+    ISSUE_IID: "6"
     ANTHROPIC_API_KEY: ""
     GITLAB_TOKEN: "glpat-DuSYGfrebh1DqZYyy5Q5eW86MQp1OmRxbDdxCw.01.120j7wput"
     GITLAB_PROJECT_ID: "79558990"
