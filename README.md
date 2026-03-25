@@ -1,11 +1,13 @@
 # DevFlow Orchestrator
 
 > **You Orchestrate. AI Accelerates.**
+
 > A GitLab issue comes in → 8 AI agents collaborate → root cause diagnosed, code fixed, security scanned, compliance checked, tests written, deployment configured, and a merge request created — automatically.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitLab Duo](https://img.shields.io/badge/GitLab%20Duo-Agent%20Platform-fc6d26)](https://docs.gitlab.com/ee/user/gitlab_duo/)
 [![Anthropic Claude](https://img.shields.io/badge/Powered%20by-Anthropic%20Claude-191919)](https://anthropic.com)
+
 ---
 
 ## The Problem
@@ -27,32 +29,32 @@ DevFlow Orchestrator listens for GitLab issue events and runs an **8-agent pipel
 
 ```
 GitLab Issue Created
-        │
-        ▼
+│
+▼
 🔍 RootCauseAgent    → Diagnoses ANY issue dynamically with Claude
-        │
-        ▼
+│
+▼
 🧠 SpecAgent         → Breaks issue into tasks, files, acceptance criteria
-        │
-        ▼
+│
+▼
 💻 CodeAgent         → Generates production-ready fixes
-        │
-        ▼
+│
+▼
 📋 ComplianceAgent   → GDPR, SOC2, OWASP ASVS, CIS, NIST checks
-        │
-        ▼
+│
+▼
 🔒 SecurityAgent     → OWASP Top 10 scan, secrets detection, CVE analysis
-        │
-        ▼
+│
+▼
 🧪 TestAgent         → Full Jest test suite with edge cases
-        │
-        ▼
+│
+▼
 👁️  ReviewAgent      → Code review + MR description
-        │
-        ▼
+│
+▼
 🚀 DeployAgent       → Dockerfile, K8s manifests, CI/CD pipeline
-        │
-        ▼
+│
+▼
 ✅ Merge Request     → Auto-created with full RCA, security & compliance report
 ```
 
@@ -62,13 +64,15 @@ All stages stream live to a real-time dashboard via WebSocket.
 
 ## Demo
 
-🎥 **[Watch 3-minute demo on YouTube](#)** ← add your link here
+🎥 **[Watch demo on YouTube](https://youtu.be/-q0eASB_EXY?si=yYR5P4omfXdu9nNX)**
 
 🖥️ **Live dashboard** at `http://localhost:3000` after setup
 
 ---
 
-## Quick Start — 3 commands
+## Quick Start
+
+**Prerequisites:** Node.js 18+, GitLab account, Anthropic API key
 
 ```bash
 # 1. Clone & install
@@ -76,7 +80,7 @@ git clone https://gitlab.com/gitlab-ai-hackathon/participants/23075558.git devfl
 cd devflow-orchestrator
 npm install
 
-# 2. Configure (copy example, fill in 3 values)
+# 2. Configure
 cp .env.example .env
 # Set: GITLAB_TOKEN, GITLAB_PROJECT_ID, ANTHROPIC_API_KEY
 
@@ -98,25 +102,115 @@ The setup wizard (`npm run setup`) will:
 
 ---
 
-## Triggering the Pipeline
+## Testing Instructions
 
-### Option A — Dashboard
-Enter any GitLab Issue IID → click ▶ Run Pipeline
+Follow these steps **in order** to fully test DevFlow Orchestrator.
 
-### Option B — GitLab Webhook (automatic)
-1. GitLab project → Settings → Webhooks
-2. URL: `http://your-server:3000/webhook`
-3. Secret: your `WEBHOOK_SECRET`
-4. Trigger: ✅ Issues events
-5. Create any issue → pipeline starts automatically
+---
 
-### Option C — API
+### Step 1 — Run the Pipeline via Script (Quickest)
+
+The fastest way to see all 8 agents in action:
+
 ```bash
-curl -X POST http://localhost:3000/trigger/3
+node scripts/run-pipeline.mjs 6
 ```
 
-### Option D — AI Assistant
-Type in the chat panel: `analyze issue #3` → Claude diagnoses it → click Run Pipeline
+Replace `6` with any GitLab issue IID in your project.
+
+**What to expect:**
+- Terminal shows each agent running with elapsed time
+- 8 comments posted to the issue on GitLab in sequence
+- Branch `devflow/issue-6-fix` created automatically
+- Generated TypeScript files committed to the branch
+- Merge Request auto-created with full audit trail
+
+Try a different issue to confirm it adapts dynamically:
+
+```bash
+node scripts/run-pipeline.mjs 11
+```
+
+---
+
+### Step 2 — Verify Results on GitLab
+
+After Step 1 completes, open GitLab and check:
+
+1. **Issues** → open the issue you ran against
+   - You should see 8+ agent comments posted in sequence: RCA → Spec → Code → Security → Compliance → Tests → Review → Deploy → Summary
+2. **Merge Requests** → a new MR titled `fix(cache): ...` should appear
+   - MR description contains full RCA, security scan, compliance score, test coverage, rollback plan
+3. **Repository → Branches** → `devflow/issue-{N}-fix` branch exists with committed files
+
+---
+
+### Step 3 — Dashboard (Real-time UI)
+
+Start the server:
+
+```bash
+npm run dev
+```
+
+Open **http://localhost:3000**, enter an issue IID, click ▶ Run Pipeline.
+
+Watch each agent stream live via WebSocket as it runs.
+
+---
+
+### Step 4 — Duo Workflow (GitLab Comment Trigger)
+
+Trigger the pipeline directly from a GitLab issue comment:
+
+1. Go to GitLab → Issues → open any issue
+2. Post this comment:
+   ```
+   @GitLab-Duo run devflow on this issue
+   ```
+3. GitLab Duo Workflow triggers automatically
+4. Watch the session log — 8 agents run visually in sequence
+5. MR gets created from `main` → `production`
+
+---
+
+### Step 5 — CI Pipeline (Manual Trigger)
+
+Trigger via GitLab CI:
+
+1. Go to GitLab → **Build → Pipelines** → latest pipeline
+2. Find the `run-pipeline` job (stage: pipeline) → click ▶
+3. For any issue: click ▶ on `run-pipeline-any-issue`, set `ISSUE_IID` variable to your issue number
+
+**Expected:** pipeline runs ~2 min, all 8 agent comments posted, MR created.
+
+---
+
+### Step 6 — Webhook (Automatic Trigger)
+
+For fully automatic triggering on every new issue:
+
+1. GitLab project → **Settings → Webhooks**
+2. URL: `http://your-server:3000/webhook`
+3. Secret: your `WEBHOOK_SECRET` from `.env`
+4. Check: ✅ Issues events
+5. Create any new issue → pipeline starts automatically within seconds
+
+---
+
+### Step 7 — Green Agent Sustainability Report
+
+Check the final pipeline summary comment on any issue — it includes:
+
+```
+💚 Green Agent — CO₂e: ~0.02g | Model routing: 62.5% Haiku | 70% energy saved vs all-Sonnet
+```
+
+Or hit the API directly:
+
+```bash
+curl http://localhost:3000/stats/green
+```
 
 ---
 
@@ -224,8 +318,6 @@ DevFlow Orchestrator tracks and minimizes LLM energy consumption:
 | `PORT` | Server port (default: 3000) |
 
 ---
-
-
 
 ## License
 
