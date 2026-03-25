@@ -1,5 +1,3 @@
-# devflow-orchestrator
-
 # DevFlow Orchestrator
 
 > **You Orchestrate. AI Accelerates.**
