@@ -4,6 +4,9 @@
 
 > A GitLab issue comes in → 8 AI agents collaborate → root cause diagnosed, code fixed, security scanned, compliance checked, tests written, deployment configured, and a merge request created — automatically.
 
+<img width="1470" height="956" alt="Screenshot 2026-03-24 at 12 27 56 AM" src="https://github.com/user-attachments/assets/06209b91-97a2-4271-8332-3aaf3fc72637" />
+
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitLab Duo](https://img.shields.io/badge/GitLab%20Duo-Agent%20Platform-fc6d26)](https://docs.gitlab.com/ee/user/gitlab_duo/)
 [![Anthropic Claude](https://img.shields.io/badge/Powered%20by-Anthropic%20Claude-191919)](https://anthropic.com)
@@ -59,6 +62,9 @@ GitLab Issue Created
 ```
 
 All stages stream live to a real-time dashboard via WebSocket.
+
+<img width="1470" height="956" alt="Screenshot 2026-03-24 at 12 27 04 AM" src="https://github.com/user-attachments/assets/bad692b8-7932-4960-b209-33be973ea042" />
+
 
 ---
 
